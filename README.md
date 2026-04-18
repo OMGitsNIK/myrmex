@@ -4,6 +4,7 @@
 
 ## Live Demo
 
+- **GitHub:** https://github.com/OMGitsNIK/myrmex
 - **Frontend:** https://myrmex.vercel.app *(deploy pending)*
 - **REST API:** https://myrmex-api.railway.app *(deploy pending)*
 - **Pricing API:** https://myrmex-pricing.railway.app *(deploy pending)*
