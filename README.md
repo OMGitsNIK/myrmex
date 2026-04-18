@@ -4,7 +4,7 @@
 
 **Program (devnet):** `9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan`  
 **Explorer:** [View on Solana Explorer](https://explorer.solana.com/address/9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan?cluster=devnet)  
-**Frontend:** https://myrmex.vercel.app *(deploy pending)*  
+**Frontend:** https://myrmex-iota.vercel.app  
 **Demo Video:** *[3-minute walkthrough — link TBD]*
 
 ---
