@@ -1,0 +1,39 @@
+# Anchor / Rust
+.anchor
+target
+**/*.rs.bk
+
+# Node
+node_modules
+.yarn
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+.venv
+venv
+
+# Next.js
+app/.next
+app/out
+app/node_modules
+
+# API
+api/node_modules
+api/dist
+
+# Secrets — NEVER commit these
+.env
+.env.local
+*.env
+api/.env
+app/.env.local
+pricing/.env
+
+# macOS
+.DS_Store
+
+# Test ledger
+test-ledger
+.anchor/test-ledger
