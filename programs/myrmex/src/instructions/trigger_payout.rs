@@ -8,7 +8,10 @@ use crate::state::{PolicyVault, RiskPool};
 
 #[derive(Accounts)]
 pub struct TriggerPayout<'info> {
-    /// Anyone can call — permissionless payout
+    /// Only pool authority (admin) may trigger payouts
+    #[account(
+        constraint = caller.key() == pool.authority @ MyrmexError::Unauthorized,
+    )]
     pub caller: Signer<'info>,
 
     #[account(
@@ -108,9 +111,15 @@ pub fn handler(ctx: Context<TriggerPayout>, oracle_value: i64) -> Result<()> {
 
     // Update pool state
     let pool = &mut ctx.accounts.pool;
-    pool.total_locked = pool.total_locked.saturating_sub(payout_amount);
-    pool.total_liquidity = pool.total_liquidity.saturating_sub(payout_amount);
-    pool.active_policy_count = pool.active_policy_count.saturating_sub(1);
+    pool.total_locked = pool.total_locked
+        .checked_sub(payout_amount)
+        .ok_or(error!(MyrmexError::MathOverflow))?;
+    pool.total_liquidity = pool.total_liquidity
+        .checked_sub(payout_amount)
+        .ok_or(error!(MyrmexError::MathOverflow))?;
+    pool.active_policy_count = pool.active_policy_count
+        .checked_sub(1)
+        .ok_or(error!(MyrmexError::MathOverflow))?;
 
     emit!(PayoutExecuted {
         policy: ctx.accounts.policy.key(),

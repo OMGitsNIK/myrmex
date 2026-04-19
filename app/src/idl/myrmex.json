@@ -955,7 +955,7 @@
         {
           "name": "caller",
           "docs": [
-            "Anyone can call — permissionless payout"
+            "Only pool authority (admin) may trigger payouts"
           ],
           "signer": true
         },
