@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { usePools } from "@/hooks/usePools";
+import { usePools, PoolData } from "@/hooks/usePools";
 import { useAnchorProgram } from "@/hooks/useAnchorProgram";
 import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
@@ -50,10 +50,13 @@ export default function PoolPage() {
 
   useEffect(() => {
     if (!program || !wallet || pools.length === 0) return;
-    pools.forEach((p: any) => {
-      const poolKey = p.publicKey.toBase58();
-      const lpMint = p.account.lpTokenMint as PublicKey;
-      refreshLpBalance(poolKey, lpMint);
+    pools.forEach(async (p: PoolData) => {
+      // Fetch lpTokenMint from chain since REST API may not include it
+      try {
+        const poolAccount = await (program as any).account.riskPool.fetch(new PublicKey(p.pubkey)) as any;
+        const lpMint = poolAccount.lpTokenMint as PublicKey;
+        refreshLpBalance(p.pubkey, lpMint);
+      } catch { /* ignore */ }
     });
   }, [program, wallet, pools, refreshLpBalance]);
 
@@ -281,33 +284,21 @@ export default function PoolPage() {
 
       {!loading && pools.length === 0 && (
         <div className="card p-8 text-center text-gray-400">
-          No active pools found. Connect wallet and initialize a pool.
+          No active pools found.
         </div>
       )}
 
       <div className="space-y-4">
-        {pools.map((p: any) => {
-          const acc = p.account;
-          const totalLiquidity = acc.totalLiquidity.toNumber() / 1_000_000;
-          const totalLocked = acc.totalLocked.toNumber() / 1_000_000;
-          const utilization =
-            totalLiquidity > 0
-              ? ((totalLocked / totalLiquidity) * 100).toFixed(1)
-              : "0.0";
-          const premiumAccrued = acc.premiumAccrued.toNumber() / 1_000_000;
-          const available = totalLiquidity - totalLocked;
-          const apy =
-            available > 0
-              ? ((premiumAccrued / available) * 365 * 100).toFixed(1)
-              : "0.0";
-          const poolKey = p.publicKey.toBase58();
+        {pools.map((p: PoolData) => {
+          const totalLiquidity = p.totalLiquidity / 1_000_000;
+          const poolKey = p.pubkey;
 
           return (
             <div key={poolKey} className="card card-hover p-6 space-y-5">
               <div className="flex justify-between items-start">
                 <div>
                   <div className="font-semibold text-white text-lg">
-                    {["Flight Delay", "Crop Drought", "Crop Flood", "DeFi Hack"][acc.poolType] || "Unknown"} Pool
+                    {["Flight Delay", "Crop Drought", "Crop Flood", "DeFi Hack"][p.poolType] || "Unknown"} Pool
                   </div>
                   <div className="text-xs text-gray-500 font-mono mt-1">
                     {poolKey.slice(0, 10)}...{poolKey.slice(-6)}
@@ -315,12 +306,12 @@ export default function PoolPage() {
                 </div>
                 <div
                   className={`px-2 py-1 rounded text-xs font-medium ${
-                    acc.isActive
+                    p.isActive
                       ? "bg-[var(--accent-dim)] text-[var(--accent)]"
                       : "bg-gray-700 text-gray-400"
                   }`}
                 >
-                  {acc.isActive ? "● Active" : "Inactive"}
+                  {p.isActive ? "● Active" : "Inactive"}
                 </div>
               </div>
 
@@ -331,15 +322,15 @@ export default function PoolPage() {
                 </div>
                 <div>
                   <div className="text-gray-500 text-xs mb-1">Utilization</div>
-                  <div className="text-white font-medium">{utilization}%</div>
+                  <div className="text-white font-medium">{p.utilizationPct}%</div>
                 </div>
                 <div>
                   <div className="text-gray-500 text-xs mb-1">Est. APY</div>
-                  <div className="text-[var(--accent)] font-bold">{apy}%</div>
+                  <div className="text-[var(--accent)] font-bold">{p.estimatedApy}%</div>
                 </div>
                 <div>
                   <div className="text-gray-500 text-xs mb-1">Active Policies</div>
-                  <div className="text-white font-medium">{acc.activePolicyCount.toNumber()}</div>
+                  <div className="text-white font-medium">{p.activePolicies}</div>
                 </div>
               </div>
 
@@ -347,12 +338,12 @@ export default function PoolPage() {
               <div>
                 <div className="flex justify-between text-xs text-gray-500 mb-1">
                   <span>Pool utilization</span>
-                  <span>{utilization}%</span>
+                  <span>{p.utilizationPct}%</span>
                 </div>
                 <div className="h-1 bg-[var(--surface-2)] rounded-full overflow-hidden">
                   <div
                     className="h-full bg-[var(--accent)] rounded-full transition-all"
-                    style={{ width: `${Math.min(Number(utilization), 100)}%` }}
+                    style={{ width: `${Math.min(Number(p.utilizationPct), 100)}%` }}
                   />
                 </div>
               </div>
