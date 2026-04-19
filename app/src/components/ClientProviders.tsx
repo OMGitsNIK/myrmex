@@ -4,6 +4,7 @@ import { SolanaWalletProvider } from "@/components/wallet/WalletProvider";
 import { Toaster } from "sonner";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { useState } from "react";
 
 const WalletMultiButton = dynamic(
   async () => {
@@ -14,23 +15,69 @@ const WalletMultiButton = dynamic(
 );
 
 export default function ClientProviders({ children }: { children: React.ReactNode }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <SolanaWalletProvider>
-      <nav className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
-        <Link href="/" className="text-xl font-bold text-emerald-400">
-          🐜 MYRMEX
-        </Link>
-        <div className="flex gap-6 text-sm text-gray-400">
-          <Link href="/buy" className="hover:text-white transition-colors">Buy Policy</Link>
-          <Link href="/pool" className="hover:text-white transition-colors">LP Pool</Link>
-          <Link href="/portfolio" className="hover:text-white transition-colors">Portfolio</Link>
-          <Link href="/simulate" className="hover:text-white transition-colors">Demo</Link>
+      <nav className="border-b border-[var(--border)] px-6 py-4 relative z-10">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          {/* Logo */}
+          <Link href="/" className="text-xl font-bold tracking-widest text-[var(--accent)] glow-text">
+            MYRMEX
+          </Link>
+
+          {/* Desktop links */}
+          <div className="hidden md:flex gap-8 text-sm text-gray-400">
+            <Link href="/buy" className="hover:text-[var(--accent)] transition-colors">Buy Policy</Link>
+            <Link href="/pool" className="hover:text-[var(--accent)] transition-colors">LP Pool</Link>
+            <Link href="/portfolio" className="hover:text-[var(--accent)] transition-colors">Portfolio</Link>
+            <Link href="/simulate" className="hover:text-[var(--accent)] transition-colors">Demo</Link>
+          </div>
+
+          {/* Wallet + hamburger */}
+          <div className="flex items-center gap-3">
+            <div suppressHydrationWarning className="hidden sm:block">
+              <WalletMultiButton />
+            </div>
+            {/* Hamburger — mobile only */}
+            <button
+              className="md:hidden flex flex-col gap-1.5 p-1"
+              onClick={() => setMenuOpen(!menuOpen)}
+              aria-label="Toggle menu"
+            >
+              <span className={`block w-5 h-0.5 bg-[var(--accent)] transition-transform duration-200 ${menuOpen ? "rotate-45 translate-y-2" : ""}`} />
+              <span className={`block w-5 h-0.5 bg-[var(--accent)] transition-opacity duration-200 ${menuOpen ? "opacity-0" : ""}`} />
+              <span className={`block w-5 h-0.5 bg-[var(--accent)] transition-transform duration-200 ${menuOpen ? "-rotate-45 -translate-y-2" : ""}`} />
+            </button>
+          </div>
         </div>
-        <div suppressHydrationWarning>
-          <WalletMultiButton />
-        </div>
+
+        {/* Mobile dropdown */}
+        {menuOpen && (
+          <div className="md:hidden mt-4 pb-4 border-t border-[var(--border)] pt-4 flex flex-col gap-4 text-sm">
+            {[
+              { href: "/buy", label: "Buy Policy" },
+              { href: "/pool", label: "LP Pool" },
+              { href: "/portfolio", label: "Portfolio" },
+              { href: "/simulate", label: "Demo" },
+            ].map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="text-gray-400 hover:text-[var(--accent)] transition-colors"
+                onClick={() => setMenuOpen(false)}
+              >
+                {item.label}
+              </Link>
+            ))}
+            <div suppressHydrationWarning className="sm:hidden">
+              <WalletMultiButton />
+            </div>
+          </div>
+        )}
       </nav>
-      <main className="max-w-6xl mx-auto px-6 py-10">
+
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
         {children}
       </main>
       <Toaster theme="dark" />

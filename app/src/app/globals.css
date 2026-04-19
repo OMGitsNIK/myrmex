@@ -3,25 +3,125 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #020817;
+  --foreground: #e2e8f0;
+  --accent: #00ff87;
+  --accent-dim: #00ff8720;
+  --accent-2: #0ea5e9;
+  --border: #1e293b;
+  --surface: #0f172a;
+  --surface-2: #1e293b;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
 }
 
+/* Futuristic grid background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0, 255, 135, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 135, 0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Glow effect at top */
+body::after {
+  content: '';
+  position: fixed;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+  height: 400px;
+  background: radial-gradient(ellipse, rgba(0, 255, 135, 0.06) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Ensure content sits above background effects */
+nav, main, footer {
+  position: relative;
+  z-index: 1;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--background); }
+::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 2px; }
+
+/* Futuristic input style */
+input[type="number"],
+input[type="text"] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* Wallet button override */
+.wallet-adapter-button {
+  background: transparent !important;
+  border: 1px solid #00ff87 !important;
+  color: #00ff87 !important;
+  font-size: 13px !important;
+  padding: 8px 16px !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  transition: all 0.2s !important;
+  height: auto !important;
+}
+
+.wallet-adapter-button:hover {
+  background: rgba(0, 255, 135, 0.1) !important;
+  box-shadow: 0 0 12px rgba(0, 255, 135, 0.2) !important;
+}
+
+.wallet-adapter-button-trigger {
+  background: transparent !important;
+}
+
+.wallet-adapter-modal-wrapper {
+  background: #0f172a !important;
+  border: 1px solid #1e293b !important;
+}
+
+/* Neon glow utility */
 @layer utilities {
+  .glow {
+    box-shadow: 0 0 20px rgba(0, 255, 135, 0.15), 0 0 40px rgba(0, 255, 135, 0.05);
+  }
+  .glow-text {
+    text-shadow: 0 0 20px rgba(0, 255, 135, 0.5);
+  }
+  .border-glow {
+    border-color: rgba(0, 255, 135, 0.4);
+    box-shadow: 0 0 10px rgba(0, 255, 135, 0.1);
+  }
   .text-balance {
     text-wrap: balance;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+  .card-hover {
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .card-hover:hover {
+    border-color: rgba(0, 255, 135, 0.3);
+    box-shadow: 0 0 20px rgba(0, 255, 135, 0.05);
   }
 }

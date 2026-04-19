@@ -13,6 +13,17 @@ import {
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { toast } from "sonner";
 
+interface PolicySuccess {
+  policyKey: string;
+  txSig: string;
+  coverageType: string;
+  payoutAmount: number;
+  premiumPaid: number;
+  expiresAt: Date;
+  threshold: number;
+  timestamp: Date;
+}
+
 export default function BuyPage() {
   const { program, wallet } = useAnchorProgram();
   const [selectedType, setSelectedType] = useState<typeof COVERAGE_TYPES[number]>(COVERAGE_TYPES[0]);
@@ -24,6 +35,7 @@ export default function BuyPage() {
   const [region, setRegion] = useState("Maharashtra");
   const [tvl, setTvl] = useState(1000000);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [policies, setPolicies] = useState<PolicySuccess[]>([]);
 
   const quoteParams =
     selectedType.key === "flight_delay"
@@ -54,7 +66,7 @@ export default function BuyPage() {
 
   const riskColor =
     !quote ? "text-gray-400"
-    : quote.risk_score < 30 ? "text-emerald-400"
+    : quote.risk_score < 30 ? "text-[var(--accent)]"
     : quote.risk_score < 70 ? "text-yellow-400"
     : "text-red-400";
 
@@ -67,7 +79,6 @@ export default function BuyPage() {
     try {
       const programId = program.programId;
 
-      // Fetch all pools and find one matching this coverage type
       const allPools = await (program as any).account.riskPool.all() as any[];
       const matchingPool = allPools.find(
         (p: any) => p.account.poolType === selectedType.id && p.account.isActive
@@ -90,13 +101,9 @@ export default function BuyPage() {
         programId
       );
 
-      const policyholderUsdc = getAssociatedTokenAddressSync(
-        USDC_MINT,
-        wallet.publicKey
-      );
+      const policyholderUsdc = getAssociatedTokenAddressSync(USDC_MINT, wallet.publicKey);
       const poolVault = (poolAccount as { vault: PublicKey }).vault;
 
-      // Ensure policyholder USDC ATA exists before attempting transfer
       const connection = program.provider.connection;
       const setupTx = new Transaction();
       setupTx.add(
@@ -110,18 +117,14 @@ export default function BuyPage() {
       await (program.provider as any).sendAndConfirm(setupTx);
 
       const triggerCondition = {
-        oraclePubkey: wallet.publicKey, // Use wallet as mock oracle for demo
+        oraclePubkey: wallet.publicKey,
         threshold: new anchor.BN(threshold),
         comparison: (selectedType.id as number) === 1 ? 1 : 0,
       };
 
-      const expiresAt = new anchor.BN(
-        Math.floor(Date.now() / 1000) + durationDays * 86400
-      );
+      const expiresAt = new anchor.BN(Math.floor(Date.now() / 1000) + durationDays * 86400);
       const payoutLamports = new anchor.BN(Math.floor(payoutAmount * 1_000_000));
-      const premiumLamports = new anchor.BN(
-        Math.floor(quote.premium_usdc * 1_000_000)
-      );
+      const premiumLamports = new anchor.BN(Math.floor(quote.premium_usdc * 1_000_000));
 
       const tx = await program.methods
         .createPolicy(
@@ -142,16 +145,20 @@ export default function BuyPage() {
         })
         .rpc();
 
-      toast.success("Policy created!", {
-        description: `Payout: $${payoutAmount} USDC | Premium: $${quote.premium_usdc}`,
-        action: {
-          label: "Explorer",
-          onClick: () =>
-            window.open(
-              explorerUrl(tx)
-            ),
+      setPolicies((prev) => [
+        {
+          policyKey: policyPda.toBase58(),
+          txSig: tx,
+          coverageType: selectedType.name,
+          payoutAmount,
+          premiumPaid: quote.premium_usdc,
+          expiresAt: new Date(Date.now() + durationDays * 86400 * 1000),
+          threshold,
+          timestamp: new Date(),
         },
-      });
+        ...prev,
+      ]);
+      toast.success("Policy created!");
     } catch (e: unknown) {
       const err = e as Error;
       toast.error("Transaction failed", { description: err.message });
@@ -163,11 +170,72 @@ export default function BuyPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-white">Buy Coverage</h1>
-        <p className="text-gray-400 mt-1">
+        <h1 className="text-3xl font-bold text-white tracking-tight">Buy Coverage</h1>
+        <p className="text-gray-400 mt-2">
           AI-priced parametric insurance — instant payouts on trigger.
         </p>
       </div>
+
+      {/* Persistent policy success cards */}
+      {policies.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-sm font-semibold text-[var(--accent)] uppercase tracking-widest">Active Policies</h2>
+          {policies.map((pol, i) => (
+            <div
+              key={i}
+              className="relative card p-6 border-[var(--accent)]/30 overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 w-40 h-40 bg-[var(--accent)] opacity-5 rounded-full blur-3xl pointer-events-none" />
+
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
+                <span className="text-sm font-semibold text-[var(--accent)]">Policy Active</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                <div>
+                  <div className="text-gray-500 text-xs mb-0.5">Coverage Type</div>
+                  <div className="text-white font-medium">{pol.coverageType}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500 text-xs mb-0.5">Max Payout</div>
+                  <div className="text-[var(--accent)] font-bold text-base">${pol.payoutAmount} USDC</div>
+                </div>
+                <div>
+                  <div className="text-gray-500 text-xs mb-0.5">Premium Paid</div>
+                  <div className="text-white font-medium">${pol.premiumPaid.toFixed(2)} USDC</div>
+                </div>
+                <div>
+                  <div className="text-gray-500 text-xs mb-0.5">Expires</div>
+                  <div className="text-white font-medium">{pol.expiresAt.toLocaleDateString()}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500 text-xs mb-0.5">Trigger Threshold</div>
+                  <div className="text-white font-mono">{pol.threshold}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500 text-xs mb-0.5">Created</div>
+                  <div className="text-white">{pol.timestamp.toLocaleTimeString()}</div>
+                </div>
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-[var(--border)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="text-xs font-mono text-gray-500 break-all">
+                  Policy: {pol.policyKey.slice(0, 12)}...{pol.policyKey.slice(-8)}
+                </div>
+                <a
+                  href={explorerUrl(pol.txSig)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs border border-[var(--accent)]/40 text-[var(--accent)] px-3 py-1.5 rounded hover:border-[var(--accent)] transition-colors whitespace-nowrap"
+                >
+                  View on Explorer →
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Coverage type selector */}
       <div className="grid grid-cols-3 gap-4">
@@ -180,8 +248,8 @@ export default function BuyPage() {
             }}
             className={`p-4 rounded-xl border text-left transition-colors ${
               selectedType.key === ct.key
-                ? "border-emerald-500 bg-emerald-500/10"
-                : "border-gray-800 hover:border-gray-600"
+                ? "border-[var(--accent)] bg-[var(--accent-dim)]"
+                : "border-[var(--border)] hover:border-gray-600"
             }`}
           >
             <div className="text-2xl mb-2">{ct.icon}</div>
@@ -191,28 +259,28 @@ export default function BuyPage() {
       </div>
 
       {/* Parameters */}
-      <div className="border border-gray-800 rounded-xl p-6 space-y-4">
-        <h2 className="font-semibold text-white">Policy Parameters</h2>
+      <div className="card p-6 space-y-4">
+        <h2 className="font-semibold text-white text-sm uppercase tracking-widest">Policy Parameters</h2>
 
         <div className="grid grid-cols-2 gap-4">
           <label className="space-y-1">
-            <span className="text-xs text-gray-400">Payout Amount (USDC)</span>
+            <span className="text-xs text-gray-500">Payout Amount (USDC)</span>
             <input
               type="number"
               value={payoutAmount}
               onChange={(e) => setPayoutAmount(Number(e.target.value))}
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white"
+              className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white focus:border-[var(--accent)]/50 outline-none transition-colors"
               min={10}
               max={selectedType.maxPayout}
             />
           </label>
           <label className="space-y-1">
-            <span className="text-xs text-gray-400">Duration (days)</span>
+            <span className="text-xs text-gray-500">Duration (days)</span>
             <input
               type="number"
               value={durationDays}
               onChange={(e) => setDurationDays(Number(e.target.value))}
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white"
+              className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white focus:border-[var(--accent)]/50 outline-none transition-colors"
               min={1}
               max={365}
             />
@@ -222,30 +290,30 @@ export default function BuyPage() {
         {selectedType.key === "flight_delay" && (
           <div className="grid grid-cols-3 gap-4">
             <label className="space-y-1">
-              <span className="text-xs text-gray-400">Origin</span>
+              <span className="text-xs text-gray-500">Origin</span>
               <input
                 value={origin}
                 onChange={(e) => setOrigin(e.target.value.toUpperCase())}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white"
+                className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white focus:border-[var(--accent)]/50 outline-none transition-colors"
                 placeholder="BOM"
               />
             </label>
             <label className="space-y-1">
-              <span className="text-xs text-gray-400">Destination</span>
+              <span className="text-xs text-gray-500">Destination</span>
               <input
                 value={destination}
                 onChange={(e) => setDestination(e.target.value.toUpperCase())}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white"
+                className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white focus:border-[var(--accent)]/50 outline-none transition-colors"
                 placeholder="DEL"
               />
             </label>
             <label className="space-y-1">
-              <span className="text-xs text-gray-400">Delay threshold (min)</span>
+              <span className="text-xs text-gray-500">Delay threshold (min)</span>
               <input
                 type="number"
                 value={threshold}
                 onChange={(e) => setThreshold(Number(e.target.value))}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white"
+                className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white focus:border-[var(--accent)]/50 outline-none transition-colors"
               />
             </label>
           </div>
@@ -254,21 +322,21 @@ export default function BuyPage() {
         {selectedType.key === "crop_drought" && (
           <div className="grid grid-cols-2 gap-4">
             <label className="space-y-1">
-              <span className="text-xs text-gray-400">Region</span>
+              <span className="text-xs text-gray-500">Region</span>
               <input
                 value={region}
                 onChange={(e) => setRegion(e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white"
+                className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white focus:border-[var(--accent)]/50 outline-none transition-colors"
                 placeholder="Maharashtra"
               />
             </label>
             <label className="space-y-1">
-              <span className="text-xs text-gray-400">Rainfall threshold (mm)</span>
+              <span className="text-xs text-gray-500">Rainfall threshold (mm)</span>
               <input
                 type="number"
                 value={threshold}
                 onChange={(e) => setThreshold(Number(e.target.value))}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white"
+                className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white focus:border-[var(--accent)]/50 outline-none transition-colors"
               />
             </label>
           </div>
@@ -276,41 +344,39 @@ export default function BuyPage() {
 
         {selectedType.key === "defi_hack" && (
           <label className="space-y-1 block">
-            <span className="text-xs text-gray-400">Protocol TVL (USD)</span>
+            <span className="text-xs text-gray-500">Protocol TVL (USD)</span>
             <input
               type="number"
               value={tvl}
               onChange={(e) => setTvl(Number(e.target.value))}
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white"
+              className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white focus:border-[var(--accent)]/50 outline-none transition-colors"
             />
           </label>
         )}
       </div>
 
       {/* Premium quote */}
-      <div className="border border-gray-800 rounded-xl p-6 space-y-4">
-        <h2 className="font-semibold text-white">AI Premium Quote</h2>
+      <div className="card p-6 space-y-4">
+        <h2 className="font-semibold text-white text-sm uppercase tracking-widest">AI Premium Quote</h2>
         {quoteLoading && (
           <div className="text-gray-400 text-sm">Calculating...</div>
         )}
         {quote && !quoteLoading && (
           <div className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-gray-400">Premium</span>
-              <span className="text-white font-semibold">
-                ${quote.premium_usdc.toFixed(2)} USDC
-              </span>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-400 text-sm">Premium</span>
+              <span className="text-white font-bold text-lg">${quote.premium_usdc.toFixed(2)} USDC</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Premium %</span>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-400 text-sm">Premium %</span>
               <span className="text-white">{quote.premium_pct.toFixed(3)}%</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Risk Score</span>
-              <span className={riskColor}>{quote.risk_score}/100</span>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-400 text-sm">Risk Score</span>
+              <span className={`font-mono font-bold ${riskColor}`}>{quote.risk_score}/100</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Confidence</span>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-400 text-sm">Confidence</span>
               <span className="text-white capitalize">{quote.confidence}</span>
             </div>
           </div>
@@ -320,12 +386,12 @@ export default function BuyPage() {
       <button
         onClick={handleBuy}
         disabled={isSubmitting || !quote || !wallet}
-        className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold py-3 rounded-lg transition-colors"
+        className="w-full bg-[var(--accent)] hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-black font-bold py-3.5 rounded-lg transition-opacity text-sm tracking-wide shadow-[0_0_20px_rgba(0,255,135,0.2)]"
       >
         {!wallet
           ? "Connect Wallet"
           : isSubmitting
-          ? "Confirming..."
+          ? "Confirming on-chain..."
           : `Buy Policy — Pay $${quote?.premium_usdc?.toFixed(2) ?? "—"} USDC`}
       </button>
     </div>
