@@ -148,7 +148,9 @@ export default function AdminPage() {
 
   const totalTvl = lamportsToUsdc(stats?.total_tvl_usdc ?? 0);
   const avgPoolUtilization =
-    stats && stats.total_pools > 0 ? stats.active_policies / stats.total_pools : 0;
+    pools.length > 0
+      ? pools.reduce((sum, p) => sum + parseFloat(p.utilizationPct), 0) / pools.length
+      : 0;
 
   return (
     <div className="space-y-8">
@@ -191,8 +193,8 @@ export default function AdminPage() {
         />
         <StatCard
           label="Avg Pool Utilization"
-          value={stats ? avgPoolUtilization.toFixed(2) : "0.00"}
-          detail="Computed as active policies / total pools"
+          value={`${avgPoolUtilization.toFixed(1)}%`}
+          detail="Average locked/liquidity ratio across all pools"
           loading={loading}
         />
       </div>
