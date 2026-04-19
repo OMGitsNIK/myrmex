@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useAnchorProgram } from "@/hooks/useAnchorProgram";
 import { usePremiumQuote } from "@/hooks/usePremiumQuote";
-import { COVERAGE_TYPES, USDC_MINT, explorerUrl } from "@/lib/constants";
+import { COVERAGE_TYPES, USDC_MINT, API_URL, explorerUrl } from "@/lib/constants";
 import * as anchor from "@coral-xyz/anchor";
 import {
   getAssociatedTokenAddressSync,
@@ -85,16 +85,16 @@ export default function BuyPage() {
     try {
       const programId = program.programId;
 
-      const allPools = await (program as any).account.riskPool.all() as any[];
+      const allPools = await fetch(`${API_URL}/api/pools`).then((r) => r.json()) as any[];
       const matchingPool = allPools.find(
-        (p: any) => p.account.poolType === selectedType.id && p.account.isActive
+        (p: any) => p.poolType === selectedType.id && p.isActive
       );
       if (!matchingPool) {
         toast.error(`No active pool found for ${selectedType.name}. Ask an admin to initialize one.`);
         return;
       }
-      const poolPda = matchingPool.publicKey as PublicKey;
-      const poolAccount = matchingPool.account;
+      const poolPda = new PublicKey(matchingPool.pubkey);
+      const poolAccount = matchingPool;
 
       const nonce = new anchor.BN(Math.floor(Date.now() / 1000));
       const [policyPda] = PublicKey.findProgramAddressSync(
@@ -108,7 +108,7 @@ export default function BuyPage() {
       );
 
       const policyholderUsdc = getAssociatedTokenAddressSync(USDC_MINT, wallet.publicKey);
-      const poolVault = (poolAccount as { vault: PublicKey }).vault;
+      const poolVault = new PublicKey((poolAccount as { vault: string }).vault);
 
       const connection = program.provider.connection;
       const setupTx = new Transaction();

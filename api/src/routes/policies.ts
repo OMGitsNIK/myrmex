@@ -20,10 +20,29 @@ router.get("/:wallet", async (req, res) => {
     ]);
 
     res.json(
-      policies.map(({ publicKey, account }) => ({
-        pubkey: publicKey.toBase58(),
-        account,
-      }))
+      policies.map(({ publicKey, account }) => {
+        const acc = account as any;
+        return {
+          pubkey: publicKey.toBase58(),
+          account: {
+            policyholder: acc.policyholder.toBase58(),
+            pool: acc.pool.toBase58(),
+            coverageType: acc.coverageType,
+            payoutAmount: acc.payoutAmount.toNumber(),
+            premiumAmount: acc.premiumAmount.toNumber(),
+            triggerCondition: {
+              oraclePubkey: acc.triggerCondition.oraclePubkey.toBase58(),
+              threshold: acc.triggerCondition.threshold.toNumber(),
+              comparison: acc.triggerCondition.comparison,
+            },
+            expiresAt: acc.expiresAt.toNumber(),
+            createdAt: acc.createdAt.toNumber(),
+            isActive: acc.isActive,
+            isClaimed: acc.isClaimed,
+            bump: acc.bump,
+          },
+        };
+      })
     );
   } catch (e: any) {
     res.status(500).json({ error: e.message });

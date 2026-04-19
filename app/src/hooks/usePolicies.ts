@@ -1,28 +1,44 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useAnchorProgram } from "./useAnchorProgram";
+import { useAnchorWallet } from "@solana/wallet-adapter-react";
+import { API_URL } from "@/lib/constants";
+
+export interface PolicyData {
+  pubkey: string;
+  account: {
+    policyholder: string;
+    pool: string;
+    coverageType: number;
+    payoutAmount: number;
+    premiumAmount: number;
+    triggerCondition: {
+      oraclePubkey: string;
+      threshold: number;
+      comparison: number;
+    };
+    expiresAt: number;
+    createdAt: number;
+    isActive: boolean;
+    isClaimed: boolean;
+    bump: number;
+  };
+}
 
 export function usePolicies() {
-  const { program, wallet } = useAnchorProgram();
-  const [policies, setPolicies] = useState<unknown[]>([]);
+  const wallet = useAnchorWallet();
+  const [policies, setPolicies] = useState<PolicyData[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!program || !wallet) return;
+    if (!wallet) return;
     setLoading(true);
-    (program as any).account.policyVault
-      .all([
-        {
-          memcmp: {
-            offset: 8,
-            bytes: wallet.publicKey.toBase58(),
-          },
-        },
-      ])
-      .then(setPolicies)
-      .catch(console.error)
+    fetch(`${API_URL}/api/policies/${wallet.publicKey.toBase58()}`)
+      .then((r) => r.json())
+      .then((data) => { setPolicies(data); setError(null); })
+      .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [program, wallet?.publicKey.toString()]);
+  }, [wallet?.publicKey.toString()]);
 
-  return { policies, loading };
+  return { policies, loading, error };
 }
