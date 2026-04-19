@@ -12,7 +12,7 @@ import {
 import { Transaction } from "@solana/web3.js";
 import { toast } from "sonner";
 import { Copy, Check } from "lucide-react";
-import { USDC_MINT, explorerUrl } from "@/lib/constants";
+import { USDC_MINT, explorerUrl, COVERAGE_NAMES, USDC_DECIMALS } from "@/lib/constants";
 
 const CopyButton = ({ text }: { text: string }) => {
   const [copied, setCopied] = useState(false);
@@ -87,7 +87,7 @@ export default function PoolPage() {
       const poolAccount = await (program as any).account.riskPool.fetch(poolPk) as any;
       const lpMint = poolAccount.lpTokenMint as PublicKey;
       const poolVault = poolAccount.vault as PublicKey;
-      const poolName = ["Flight", "Crop Drought", "Crop Flood", "DeFi Hack"][poolAccount.poolType] || "Unknown";
+      const poolName = COVERAGE_NAMES[poolAccount.poolType] ?? `Pool Type ${poolAccount.poolType}`;
 
       const lpMintKey = new PublicKey(lpMint);
       const providerUsdc = getAssociatedTokenAddressSync(USDC_MINT, wallet.publicKey);
@@ -106,7 +106,7 @@ export default function PoolPage() {
       await (program.provider as any).sendAndConfirm(setupTx);
 
       const tx = await program.methods
-        .fundPool(new anchor.BN(Math.floor(amount * 1_000_000)))
+        .fundPool(new anchor.BN(Math.floor(amount * USDC_DECIMALS)))
         .accounts({
           provider: wallet.publicKey,
           pool: poolPk,
@@ -152,7 +152,7 @@ export default function PoolPage() {
       const poolAccount = await (program as any).account.riskPool.fetch(poolPk) as any;
       const lpMint = new PublicKey(poolAccount.lpTokenMint as PublicKey);
       const poolVault = poolAccount.vault as PublicKey;
-      const poolName = ["Flight", "Crop Drought", "Crop Flood", "DeFi Hack"][poolAccount.poolType] || "Unknown";
+      const poolName = COVERAGE_NAMES[poolAccount.poolType] ?? `Pool Type ${poolAccount.poolType}`;
 
       const providerUsdc = getAssociatedTokenAddressSync(USDC_MINT, wallet.publicKey);
       const providerLpTokens = getAssociatedTokenAddressSync(lpMint, wallet.publicKey);
@@ -170,7 +170,7 @@ export default function PoolPage() {
       await (program.provider as any).sendAndConfirm(setupTx);
 
       const tx = await program.methods
-        .withdrawLp(new anchor.BN(Math.floor(amount * 1_000_000)))
+        .withdrawLp(new anchor.BN(Math.floor(amount * USDC_DECIMALS)))
         .accounts({
           provider: wallet.publicKey,
           pool: poolPk,
@@ -305,7 +305,7 @@ export default function PoolPage() {
 
       <div className="space-y-4">
         {pools.map((p: PoolData) => {
-          const totalLiquidity = p.totalLiquidity / 1_000_000;
+          const totalLiquidity = p.totalLiquidity / USDC_DECIMALS;
           const poolKey = p.pubkey;
 
           return (
@@ -313,7 +313,7 @@ export default function PoolPage() {
               <div className="flex justify-between items-start">
                 <div>
                   <div className="font-semibold text-white text-lg">
-                    {["Flight Delay", "Crop Drought", "Crop Flood", "DeFi Hack"][p.poolType] || "Unknown"} Pool
+                    {COVERAGE_NAMES[p.poolType] ?? `Pool Type ${p.poolType}`} Pool
                   </div>
                   <div className="text-xs text-gray-500 font-mono mt-1">
                     {poolKey.slice(0, 10)}...{poolKey.slice(-6)}

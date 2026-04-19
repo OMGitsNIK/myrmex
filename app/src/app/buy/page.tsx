@@ -130,7 +130,7 @@ export default function BuyPage() {
       const triggerCondition = {
         oraclePubkey: wallet.publicKey,
         threshold: new anchor.BN(threshold),
-        comparison: (selectedType.id as number) === 1 ? 1 : 0,
+        comparison: selectedType.comparison,
       };
 
       const expiresAt = new anchor.BN(Math.floor(Date.now() / 1000) + durationDays * 86400);

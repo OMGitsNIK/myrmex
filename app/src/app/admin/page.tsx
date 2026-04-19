@@ -1,6 +1,6 @@
 "use client";
 
-import { API_URL } from "@/lib/constants";
+import { API_URL, COVERAGE_NAMES, USDC_DECIMALS } from "@/lib/constants";
 import { useEffect, useState } from "react";
 
 interface StatsResponse {
@@ -23,18 +23,8 @@ interface PoolResponse {
   isActive: boolean;
 }
 
-const POOL_TYPE_LABELS: Record<number, string> = {
-  0: "Flight Delay",
-  1: "Crop Drought",
-  2: "Crop Flood",
-  3: "DeFi Hack",
-  4: "Stablecoin Depeg",
-  5: "Hurricane",
-  6: "Hospitalization",
-};
-
 function lamportsToUsdc(value: number) {
-  return value / 1_000_000;
+  return value / USDC_DECIMALS;
 }
 
 function formatUsdc(value: number) {
@@ -239,7 +229,7 @@ export default function AdminPage() {
                   <tr key={pool.pubkey} className="border-t border-[var(--border)]">
                     <td className="px-6 py-4">
                       <div className="font-medium text-white">
-                        {POOL_TYPE_LABELS[pool.poolType] || `Type ${pool.poolType}`}
+                        {COVERAGE_NAMES[pool.poolType] ?? `Pool Type ${pool.poolType}`}
                       </div>
                       <div className="mt-1 text-xs text-gray-500">
                         Utilization {pool.utilizationPct}% • {pool.isActive ? "Active" : "Inactive"}

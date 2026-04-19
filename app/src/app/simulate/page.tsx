@@ -1,24 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { API_URL, explorerUrl } from "@/lib/constants";
+import { API_URL, explorerUrl, COVERAGE_NAMES, COMPARISON_LABELS, USDC_DECIMALS } from "@/lib/constants";
 import { toast } from "sonner";
-
-const COVERAGE_NAMES: Record<number, string> = {
-  0: "Flight Delay ✈",
-  1: "Crop Drought 🌾",
-  2: "Crop Flood 🌊",
-  3: "DeFi Hack 🛡",
-  4: "Stablecoin Depeg",
-  5: "Hurricane 🌀",
-  6: "Hospitalization 🏥",
-};
-
-const COMPARISON_LABELS: Record<number, string> = {
-  0: ">",
-  1: "<",
-  2: "==",
-};
 
 interface PolicyInfo {
   coverageType: number;
@@ -69,7 +53,7 @@ export default function SimulatePage() {
           comparison: tc.comparison,
           isActive: data.account.isActive,
           isClaimed: data.account.isClaimed,
-          payoutAmount: data.account.payoutAmount / 1_000_000,
+          payoutAmount: data.account.payoutAmount / USDC_DECIMALS,
         };
         setPolicyInfo(info);
         setOracleValue(validOracleValue(tc.comparison, tc.threshold));

@@ -3,22 +3,7 @@
 import { useState } from "react";
 import { usePolicies, PolicyData } from "@/hooks/usePolicies";
 import { useAnchorWallet } from "@solana/wallet-adapter-react";
-
-const COVERAGE_NAMES: Record<number, string> = {
-  0: "Flight Delay ✈",
-  1: "Crop Drought 🌾",
-  2: "Crop Flood 🌊",
-  3: "DeFi Hack 🛡",
-  4: "Stablecoin Depeg",
-  5: "Hurricane 🌀",
-  6: "Hospitalization 🏥",
-};
-
-const COMPARISON_LABELS: Record<number, string> = {
-  0: ">",
-  1: "<",
-  2: "==",
-};
+import { COVERAGE_NAMES, COMPARISON_LABELS, USDC_DECIMALS } from "@/lib/constants";
 
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
@@ -51,8 +36,8 @@ function CopyButton({ value }: { value: string }) {
 
 function PolicyCard({ p }: { p: PolicyData }) {
   const acc = p.account;
-  const payout = acc.payoutAmount / 1_000_000;
-  const premium = acc.premiumAmount / 1_000_000;
+  const payout = acc.payoutAmount / USDC_DECIMALS;
+  const premium = acc.premiumAmount / USDC_DECIMALS;
   const expiresAt = new Date(acc.expiresAt * 1000);
   const isExpired = expiresAt < new Date();
   const pubkey = p.pubkey;
