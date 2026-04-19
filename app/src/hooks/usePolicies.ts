@@ -10,7 +10,7 @@ export function usePolicies() {
   useEffect(() => {
     if (!program || !wallet) return;
     setLoading(true);
-    (program as any).account.policyVault
+    (program as any).account.policy
       .all([
         {
           memcmp: {
