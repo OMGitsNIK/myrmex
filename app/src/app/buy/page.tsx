@@ -35,6 +35,13 @@ export default function BuyPage() {
   const [tvl, setTvl] = useState(1000000);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [policies, setPolicies] = useState<PolicySuccess[]>([]);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const copyKey = (key: string) => {
+    navigator.clipboard.writeText(key);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 1500);
+  };
 
   const quoteParams =
     selectedType.key === "flight_delay"
@@ -219,8 +226,26 @@ export default function BuyPage() {
               </div>
 
               <div className="mt-4 pt-4 border-t border-[var(--border)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="text-xs font-mono text-gray-500 break-all">
-                  Policy: {pol.policyKey.slice(0, 12)}...{pol.policyKey.slice(-8)}
+                <div className="flex items-center gap-2">
+                  <div className="text-xs font-mono text-gray-500">
+                    Policy: {pol.policyKey.slice(0, 12)}...{pol.policyKey.slice(-8)}
+                  </div>
+                  <button
+                    onClick={() => copyKey(pol.policyKey)}
+                    title="Copy policy public key"
+                    className={`transition-colors ${copiedKey === pol.policyKey ? "text-[var(--accent)]" : "text-gray-500 hover:text-[var(--accent)]"}`}
+                  >
+                    {copiedKey === pol.policyKey ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                      </svg>
+                    )}
+                  </button>
                 </div>
                 <a
                   href={explorerUrl(pol.txSig)}
