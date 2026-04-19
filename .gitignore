@@ -38,3 +38,4 @@ pricing/.env
 test-ledger
 .anchor/test-ledger
 .vercel
+*.db
