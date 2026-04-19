@@ -96,7 +96,7 @@ export default function BuyPage() {
       const poolPda = new PublicKey(matchingPool.pubkey);
       const poolAccount = matchingPool;
 
-      const nonce = new anchor.BN(Math.floor(Date.now() / 1000));
+      const nonce = new anchor.BN(Date.now()); // milliseconds for uniqueness
       const [policyPda] = PublicKey.findProgramAddressSync(
         [
           Buffer.from("policy"),
@@ -120,7 +120,12 @@ export default function BuyPage() {
       const { blockhash } = await connection.getLatestBlockhash();
       setupTx.recentBlockhash = blockhash;
       setupTx.feePayer = wallet.publicKey;
-      await (program.provider as any).sendAndConfirm(setupTx);
+      try {
+        await (program.provider as any).sendAndConfirm(setupTx);
+      } catch (e: any) {
+        // ATA already exists or tx already processed — safe to continue
+        if (!e?.message?.includes("already been processed") && !e?.message?.includes("already in use")) throw e;
+      }
 
       const triggerCondition = {
         oraclePubkey: wallet.publicKey,
