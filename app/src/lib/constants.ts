@@ -5,10 +5,10 @@ export const PROGRAM_ID = new PublicKey(
     "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan"
 );
 
-// Devnet USDC
+// Devnet USDC — test mint with admin as mint authority (matches pools on devnet)
 export const USDC_MINT = new PublicKey(
   process.env.NEXT_PUBLIC_USDC_MINT ||
-    "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
+    "HM4vdUJGhAbD44G1CDQ7gx6HFUTvaoCgxtkNPXNfP9jo"
 );
 
 export const RPC_URL =
@@ -25,7 +25,7 @@ export function explorerUrl(tx: string): string {
 }
 
 export const PRICING_API =
-  process.env.NEXT_PUBLIC_PRICING_API || "http://localhost:8000";
+  process.env.NEXT_PUBLIC_PRICING_API || "http://localhost:8001";
 
 export const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";

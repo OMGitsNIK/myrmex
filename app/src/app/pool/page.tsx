@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { usePools } from "@/hooks/usePools";
 import { useAnchorProgram } from "@/hooks/useAnchorProgram";
 import * as anchor from "@coral-xyz/anchor";
@@ -13,7 +13,8 @@ import { Transaction } from "@solana/web3.js";
 import { toast } from "sonner";
 import { USDC_MINT, explorerUrl } from "@/lib/constants";
 
-interface DepositSuccess {
+interface PoolActionSuccess {
+  kind: "deposit" | "withdraw";
   poolKey: string;
   poolName: string;
   amount: number;
@@ -25,8 +26,36 @@ export default function PoolPage() {
   const { pools, loading } = usePools();
   const { program, wallet } = useAnchorProgram();
   const [depositAmounts, setDepositAmounts] = useState<Record<string, string>>({});
+  const [withdrawAmounts, setWithdrawAmounts] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState<string | null>(null);
-  const [successes, setSuccesses] = useState<DepositSuccess[]>([]);
+  const [withdrawing, setWithdrawing] = useState<string | null>(null);
+  const [successes, setSuccesses] = useState<PoolActionSuccess[]>([]);
+  const [lpBalances, setLpBalances] = useState<Record<string, number>>({});
+
+  const refreshLpBalance = useCallback(
+    async (poolPubkey: string, lpMint: PublicKey) => {
+      if (!program || !wallet) return;
+      const connection = program.provider.connection;
+      const providerLpAta = getAssociatedTokenAddressSync(lpMint, wallet.publicKey);
+      try {
+        const info = await connection.getTokenAccountBalance(providerLpAta);
+        const amount = Number(info.value.uiAmountString ?? "0");
+        setLpBalances((prev) => ({ ...prev, [poolPubkey]: amount }));
+      } catch {
+        setLpBalances((prev) => ({ ...prev, [poolPubkey]: 0 }));
+      }
+    },
+    [program, wallet]
+  );
+
+  useEffect(() => {
+    if (!program || !wallet || pools.length === 0) return;
+    pools.forEach((p: any) => {
+      const poolKey = p.publicKey.toBase58();
+      const lpMint = p.account.lpTokenMint as PublicKey;
+      refreshLpBalance(poolKey, lpMint);
+    });
+  }, [program, wallet, pools, refreshLpBalance]);
 
   const handleDeposit = async (poolPubkey: string) => {
     if (!program || !wallet) return;
@@ -73,6 +102,7 @@ export default function PoolPage() {
 
       setSuccesses((prev) => [
         {
+          kind: "deposit",
           poolKey: poolPubkey,
           poolName,
           amount,
@@ -83,11 +113,76 @@ export default function PoolPage() {
       ]);
       setDepositAmounts((prev) => ({ ...prev, [poolPubkey]: "" }));
       toast.success(`Deposited ${amount} USDC into ${poolName} pool`);
+      refreshLpBalance(poolPubkey, lpMintKey);
     } catch (e: unknown) {
       const err = e as Error;
       toast.error("Deposit failed", { description: err.message });
     } finally {
       setSubmitting(null);
+    }
+  };
+
+  const handleWithdraw = async (poolPubkey: string) => {
+    if (!program || !wallet) return;
+    const amount = Number(withdrawAmounts[poolPubkey]);
+    if (!amount || amount <= 0) {
+      toast.error("Enter a valid LP token amount");
+      return;
+    }
+    setWithdrawing(poolPubkey);
+    try {
+      const poolPk = new PublicKey(poolPubkey);
+      const poolAccount = await (program as any).account.riskPool.fetch(poolPk) as any;
+      const lpMint = new PublicKey(poolAccount.lpTokenMint as PublicKey);
+      const poolVault = poolAccount.vault as PublicKey;
+      const poolName = ["Flight", "Crop Drought", "Crop Flood", "DeFi Hack"][poolAccount.poolType] || "Unknown";
+
+      const providerUsdc = getAssociatedTokenAddressSync(USDC_MINT, wallet.publicKey);
+      const providerLpTokens = getAssociatedTokenAddressSync(lpMint, wallet.publicKey);
+
+      const connection = program.provider.connection;
+      const setupTx = new Transaction();
+      setupTx.add(
+        createAssociatedTokenAccountIdempotentInstruction(
+          wallet.publicKey, providerUsdc, wallet.publicKey, USDC_MINT
+        )
+      );
+      const { blockhash } = await connection.getLatestBlockhash();
+      setupTx.recentBlockhash = blockhash;
+      setupTx.feePayer = wallet.publicKey;
+      await (program.provider as any).sendAndConfirm(setupTx);
+
+      const tx = await program.methods
+        .withdrawLp(new anchor.BN(Math.floor(amount * 1_000_000)))
+        .accounts({
+          provider: wallet.publicKey,
+          pool: poolPk,
+          providerUsdc,
+          poolVault,
+          lpTokenMint: lpMint,
+          providerLpTokens,
+        })
+        .rpc();
+
+      setSuccesses((prev) => [
+        {
+          kind: "withdraw",
+          poolKey: poolPubkey,
+          poolName,
+          amount,
+          txSig: tx,
+          timestamp: new Date(),
+        },
+        ...prev,
+      ]);
+      setWithdrawAmounts((prev) => ({ ...prev, [poolPubkey]: "" }));
+      toast.success(`Withdrew ${amount} LP tokens from ${poolName} pool`);
+      refreshLpBalance(poolPubkey, lpMint);
+    } catch (e: unknown) {
+      const err = e as Error;
+      toast.error("Withdrawal failed", { description: err.message });
+    } finally {
+      setWithdrawing(null);
     }
   };
 
@@ -103,7 +198,7 @@ export default function PoolPage() {
       {/* Persistent success cards */}
       {successes.length > 0 && (
         <div className="space-y-4">
-          <h2 className="text-sm font-semibold text-[var(--accent)] uppercase tracking-widest">Your Deposits</h2>
+          <h2 className="text-sm font-semibold text-[var(--accent)] uppercase tracking-widest">Your Activity</h2>
           {successes.map((s, i) => (
             <div
               key={i}
@@ -116,9 +211,15 @@ export default function PoolPage() {
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
-                    <span className="text-sm font-semibold text-[var(--accent)]">Deposit Confirmed</span>
+                    <span className="text-sm font-semibold text-[var(--accent)]">
+                      {s.kind === "deposit" ? "Deposit Confirmed" : "Withdrawal Confirmed"}
+                    </span>
                   </div>
-                  <div className="text-2xl font-bold text-white">${s.amount.toLocaleString()} USDC</div>
+                  <div className="text-2xl font-bold text-white">
+                    {s.kind === "deposit"
+                      ? `$${s.amount.toLocaleString()} USDC`
+                      : `${s.amount.toLocaleString()} MYR-LP`}
+                  </div>
                   <div className="text-sm text-gray-400">{s.poolName} Pool · {s.timestamp.toLocaleTimeString()}</div>
                 </div>
 
@@ -135,21 +236,40 @@ export default function PoolPage() {
                 </div>
               </div>
 
-              {/* LP tokens visual */}
-              <div className="mt-4 pt-4 border-t border-[var(--border)] grid grid-cols-3 gap-4 text-sm">
-                <div>
-                  <div className="text-gray-500 text-xs">Deposited</div>
-                  <div className="text-white font-medium">${s.amount} USDC</div>
+              {/* Deposit-specific tokens visual */}
+              {s.kind === "deposit" && (
+                <div className="mt-4 pt-4 border-t border-[var(--border)] grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <div className="text-gray-500 text-xs">Deposited</div>
+                    <div className="text-white font-medium">${s.amount} USDC</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500 text-xs">LP Tokens Minted</div>
+                    <div className="text-[var(--accent)] font-medium font-mono">~{s.amount} MYR-LP</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500 text-xs">Status</div>
+                    <div className="text-[var(--accent)] font-medium">Earning Premiums</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-gray-500 text-xs">LP Tokens Minted</div>
-                  <div className="text-[var(--accent)] font-medium font-mono">~{s.amount} MYR-LP</div>
+              )}
+
+              {s.kind === "withdraw" && (
+                <div className="mt-4 pt-4 border-t border-[var(--border)] grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <div className="text-gray-500 text-xs">LP Burned</div>
+                    <div className="text-white font-medium">{s.amount} MYR-LP</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500 text-xs">USDC Returned</div>
+                    <div className="text-[var(--accent)] font-medium font-mono">~${s.amount}</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500 text-xs">Status</div>
+                    <div className="text-[var(--accent)] font-medium">Exited Pool</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-gray-500 text-xs">Status</div>
-                  <div className="text-[var(--accent)] font-medium">Earning Premiums</div>
-                </div>
-              </div>
+              )}
             </div>
           ))}
         </div>
@@ -255,6 +375,51 @@ export default function PoolPage() {
                 >
                   {submitting === poolKey ? "Depositing..." : "Deposit"}
                 </button>
+              </div>
+
+              {/* Withdraw row */}
+              <div className="flex flex-col gap-2">
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>Withdraw LP tokens</span>
+                  {wallet && (
+                    <span className="font-mono">
+                      Balance: {(lpBalances[poolKey] ?? 0).toLocaleString(undefined, { maximumFractionDigits: 4 })} MYR-LP
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1 relative">
+                    <input
+                      type="number"
+                      placeholder="LP amount"
+                      value={withdrawAmounts[poolKey] || ""}
+                      onChange={(e) =>
+                        setWithdrawAmounts((prev) => ({ ...prev, [poolKey]: e.target.value }))
+                      }
+                      className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 pr-14 text-white text-sm focus:border-[var(--accent)]/50 outline-none transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const bal = lpBalances[poolKey];
+                        if (bal && bal > 0) {
+                          setWithdrawAmounts((prev) => ({ ...prev, [poolKey]: String(bal) }));
+                        }
+                      }}
+                      disabled={!wallet || !(lpBalances[poolKey] > 0)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-[var(--accent)] border border-[var(--accent)]/40 rounded px-2 py-0.5 disabled:opacity-30 hover:border-[var(--accent)] transition-colors"
+                    >
+                      MAX
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => handleWithdraw(poolKey)}
+                    disabled={!wallet || withdrawing === poolKey}
+                    className="border border-[var(--accent)]/60 hover:border-[var(--accent)] text-[var(--accent)] font-bold px-5 py-2 rounded-lg text-sm transition-colors disabled:opacity-40"
+                  >
+                    {withdrawing === poolKey ? "Withdrawing..." : "Withdraw"}
+                  </button>
+                </div>
               </div>
             </div>
           );
