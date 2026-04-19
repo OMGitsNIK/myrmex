@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { policyRouter } from "./routes/policies";
+import { policyByPubkeyRouter } from "./routes/policy";
 import { poolRouter } from "./routes/pools";
 import { simulateRouter } from "./routes/simulate";
 import { quoteRouter } from "./routes/quote";
@@ -16,6 +17,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use("/api/policies", policyRouter);
+app.use("/api/policy", policyByPubkeyRouter);
 app.use("/api/pools", poolRouter);
 app.use("/api/simulate-trigger", simulateRouter);
 app.use("/api/quote", quoteRouter);

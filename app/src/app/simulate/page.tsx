@@ -1,8 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { API_URL, explorerUrl } from "@/lib/constants";
 import { toast } from "sonner";
+
+const COVERAGE_NAMES: Record<number, string> = {
+  0: "Flight Delay ✈",
+  1: "Crop Drought 🌾",
+  2: "Crop Flood 🌊",
+  3: "DeFi Hack 🛡",
+  4: "Stablecoin Depeg",
+  5: "Hurricane 🌀",
+  6: "Hospitalization 🏥",
+};
+
+const COMPARISON_LABELS: Record<number, string> = {
+  0: ">",
+  1: "<",
+  2: "==",
+};
+
+interface PolicyInfo {
+  coverageType: number;
+  threshold: number;
+  comparison: number;
+  isActive: boolean;
+  isClaimed: boolean;
+  payoutAmount: number;
+}
 
 interface TxStep {
   label: string;
@@ -11,21 +36,58 @@ interface TxStep {
   ms?: number;
 }
 
+function validOracleValue(comparison: number, threshold: number): number {
+  if (comparison === 0) return threshold + 50;  // value > threshold
+  if (comparison === 1) return Math.max(0, threshold - 10);  // value < threshold
+  return threshold;  // value == threshold
+}
+
 export default function SimulatePage() {
   const [policyPubkey, setPolicyPubkey] = useState("");
   const [oracleValue, setOracleValue] = useState(150);
+  const [policyInfo, setPolicyInfo] = useState<PolicyInfo | null>(null);
+  const [fetchingPolicy, setFetchingPolicy] = useState(false);
   const [steps, setSteps] = useState<TxStep[]>([]);
   const [running, setRunning] = useState(false);
   const [totalMs, setTotalMs] = useState<number | null>(null);
+
+  // Auto-fetch policy info when a valid-looking pubkey is entered
+  useEffect(() => {
+    const trimmed = policyPubkey.trim();
+    if (trimmed.length < 32) { setPolicyInfo(null); return; }
+
+    const timer = setTimeout(async () => {
+      setFetchingPolicy(true);
+      try {
+        const res = await fetch(`${API_URL}/api/policy/${trimmed}`);
+        if (!res.ok) { setPolicyInfo(null); return; }
+        const data = await res.json();
+        const tc = data.account.triggerCondition;
+        const info: PolicyInfo = {
+          coverageType: data.account.coverageType,
+          threshold: tc.threshold,
+          comparison: tc.comparison,
+          isActive: data.account.isActive,
+          isClaimed: data.account.isClaimed,
+          payoutAmount: data.account.payoutAmount / 1_000_000,
+        };
+        setPolicyInfo(info);
+        setOracleValue(validOracleValue(tc.comparison, tc.threshold));
+      } catch {
+        setPolicyInfo(null);
+      } finally {
+        setFetchingPolicy(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [policyPubkey]);
 
   const updateStep = (i: number, update: Partial<TxStep>) =>
     setSteps((prev) => prev.map((s, idx) => (idx === i ? { ...s, ...update } : s)));
 
   const simulate = async () => {
-    if (!policyPubkey) {
-      toast.error("Enter a policy pubkey");
-      return;
-    }
+    if (!policyPubkey) { toast.error("Enter a policy pubkey"); return; }
     setRunning(true);
     setTotalMs(null);
     const start = Date.now();
@@ -39,7 +101,6 @@ export default function SimulatePage() {
     setSteps(initialSteps);
 
     try {
-      // Step 1
       updateStep(0, { status: "running" });
       await delay(300);
       const t1 = Date.now();
@@ -57,22 +118,12 @@ export default function SimulatePage() {
 
       const data = await res.json();
       updateStep(0, { status: "success", ms: Date.now() - t1 });
-
-      // Step 2
       updateStep(1, { status: "running" });
       await delay(200);
       updateStep(1, { status: "success", ms: 200 });
-
-      // Step 3
       updateStep(2, { status: "running" });
       await delay(100);
-      updateStep(2, {
-        status: "success",
-        txSig: data.payout_tx,
-        ms: Date.now() - t1,
-      });
-
-      // Step 4
+      updateStep(2, { status: "success", txSig: data.payout_tx, ms: Date.now() - t1 });
       updateStep(3, { status: "running" });
       await delay(300);
       updateStep(3, { status: "success", ms: 300 });
@@ -85,9 +136,7 @@ export default function SimulatePage() {
       toast.error("Simulation failed", { description: err.message });
       setSteps((prev) =>
         prev.map((s) =>
-          s.status === "running" || s.status === "idle"
-            ? { ...s, status: "error" }
-            : s
+          s.status === "running" || s.status === "idle" ? { ...s, status: "error" } : s
         )
       );
     } finally {
@@ -101,6 +150,10 @@ export default function SimulatePage() {
     if (s === "success") return <span className="text-emerald-400">✓</span>;
     return <span className="text-red-400">✗</span>;
   };
+
+  const triggerLabel = policyInfo
+    ? `value ${COMPARISON_LABELS[policyInfo.comparison]} ${policyInfo.threshold}`
+    : null;
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
@@ -118,15 +171,43 @@ export default function SimulatePage() {
           <span className="text-xs text-gray-400">Policy Public Key</span>
           <input
             value={policyPubkey}
-            onChange={(e) => setPolicyPubkey(e.target.value)}
-            placeholder="Enter policy pubkey from portfolio..."
+            onChange={(e) => { setPolicyPubkey(e.target.value); setSteps([]); setTotalMs(null); }}
+            placeholder="Paste a policy pubkey from your portfolio..."
             className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm font-mono"
           />
         </label>
 
+        {fetchingPolicy && (
+          <p className="text-xs text-gray-500">Looking up policy...</p>
+        )}
+
+        {policyInfo && (
+          <div className="rounded-lg bg-gray-900 border border-gray-700 px-4 py-3 space-y-1 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-400">Coverage type</span>
+              <span className="text-white">{COVERAGE_NAMES[policyInfo.coverageType] || `Type ${policyInfo.coverageType}`}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Trigger condition</span>
+              <span className="text-white font-mono">{triggerLabel}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Payout</span>
+              <span className="text-[var(--accent)] font-semibold">${policyInfo.payoutAmount.toLocaleString()} USDC</span>
+            </div>
+            {policyInfo.isClaimed && (
+              <p className="text-yellow-400 text-xs pt-1">⚠ This policy has already been claimed.</p>
+            )}
+            {!policyInfo.isActive && !policyInfo.isClaimed && (
+              <p className="text-red-400 text-xs pt-1">⚠ This policy is expired or inactive.</p>
+            )}
+          </div>
+        )}
+
         <label className="block space-y-1">
           <span className="text-xs text-gray-400">
-            Oracle Value (e.g. 150 minutes delay)
+            Oracle Value
+            {triggerLabel && <span className="ml-2 text-emerald-400">(must satisfy: {triggerLabel})</span>}
           </span>
           <input
             type="number"
@@ -138,27 +219,24 @@ export default function SimulatePage() {
 
         <button
           onClick={simulate}
-          disabled={running}
+          disabled={running || (policyInfo?.isClaimed ?? false)}
           className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black font-semibold py-3 rounded-lg transition-colors"
         >
-          {running ? "Simulating..." : "🚀 Simulate Flight Delay Trigger"}
+          {running
+            ? "Simulating..."
+            : policyInfo
+            ? `🚀 Simulate ${COVERAGE_NAMES[policyInfo.coverageType] ?? "Policy"} Trigger`
+            : "🚀 Simulate Trigger"}
         </button>
       </div>
 
-      {/* Timeline */}
       {steps.length > 0 && (
         <div className="border border-gray-800 rounded-xl p-6 space-y-4">
           <h2 className="font-semibold text-white">Execution Timeline</h2>
-
           <div className="space-y-3">
             {steps.map((step, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-3 p-3 rounded-lg bg-gray-900"
-              >
-                <span className="text-lg w-6 text-center">
-                  {statusIcon(step.status)}
-                </span>
+              <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-gray-900">
+                <span className="text-lg w-6 text-center">{statusIcon(step.status)}</span>
                 <div className="flex-1">
                   <div className="text-sm text-white">{step.label}</div>
                   {step.txSig && (
@@ -172,39 +250,30 @@ export default function SimulatePage() {
                     </a>
                   )}
                 </div>
-                {step.ms && (
-                  <span className="text-xs text-gray-400">{step.ms}ms</span>
-                )}
+                {step.ms && <span className="text-xs text-gray-400">{step.ms}ms</span>}
               </div>
             ))}
           </div>
 
           {totalMs !== null && (
             <div className="text-center py-4">
-              <div className="text-3xl font-bold text-emerald-400">
-                {totalMs}ms
-              </div>
-              <div className="text-sm text-gray-400 mt-1">
-                Total time from trigger to payout
-              </div>
+              <div className="text-3xl font-bold text-emerald-400">{totalMs}ms</div>
+              <div className="text-sm text-gray-400 mt-1">Total time from trigger to payout</div>
             </div>
           )}
         </div>
       )}
 
-      {/* Context */}
       <div className="border border-gray-800 rounded-xl p-6 space-y-3 text-sm text-gray-400">
         <p>
           <span className="text-white font-medium">What&apos;s happening:</span>{" "}
-          The API calls the on-chain{" "}
-          <code className="text-emerald-400">trigger_payout</code> instruction.
-          The smart contract verifies the oracle value against the policy&apos;s
-          trigger condition, marks the policy as claimed, and transfers USDC to
-          the policyholder — all in a single atomic transaction.
+          The API calls the on-chain <code className="text-emerald-400">trigger_payout</code> instruction.
+          The smart contract verifies the oracle value against the policy&apos;s trigger condition,
+          marks the policy as claimed, and transfers USDC to the policyholder — all in a single atomic transaction.
         </p>
         <p>
-          <span className="text-white font-medium">No trust required:</span> Anyone
-          can call trigger_payout. The contract enforces all rules on-chain.
+          <span className="text-white font-medium">No trust required:</span> Anyone can call trigger_payout.
+          The contract enforces all rules on-chain.
         </p>
       </div>
     </div>
