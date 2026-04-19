@@ -37,7 +37,7 @@ export function getAnchorProgram() {
   anchor.setProvider(_provider);
 
   // Load IDL
-  const idlPath = path.join(__dirname, "../../..", "target/idl/myrmex.json");
+  const idlPath = path.join(__dirname, "../idl/myrmex.json");
   const idl = JSON.parse(fs.readFileSync(idlPath, "utf-8"));
   _program = new anchor.Program(idl, _provider);
 
