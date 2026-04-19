@@ -378,6 +378,11 @@ export default function BuyPage() {
               <span className="text-gray-400 text-sm">Confidence</span>
               <span className="text-white capitalize">{quote.confidence}</span>
             </div>
+            {(quote as any).breakdown?.source === "local_fallback" && (
+              <div className="text-xs text-yellow-500/70 pt-1">
+                Estimate only — pricing API offline. Quote uses actuarial fallback rates.
+              </div>
+            )}
           </div>
         )}
       </div>
