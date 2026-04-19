@@ -1,4 +1,4 @@
-# 🐜 MYRMEX — Decentralized Parametric Insurance on Solana
+#  MYRMEX — Decentralized Parametric Insurance on Solana
 
 > Insurance that pays itself. No adjusters. No claims process. When an oracle confirms a real-world trigger event, USDC moves to the policyholder automatically — in the same block.
 
@@ -32,11 +32,11 @@ Three groups of participants interact with MYRMEX:
 │         │                          │                     │       │
 │         └──────────────────────────┴─────────────────────┘       │
 │                                    │                             │
-│                         ┌──────────▼──────────┐                 │
+│                         ┌──────────▼───────────┐                 │
 │                         │   MYRMEX PROGRAM     │                 │
 │                         │   (Solana / Anchor)  │                 │
 │                         │                      │                 │
-│                         │  oracle value meets   │                 │
+│                         │  oracle value meets  │                 │
 │                         │  threshold? → pay    │                 │
 │                         └──────────────────────┘                 │
 └──────────────────────────────────────────────────────────────────┘
@@ -302,12 +302,12 @@ anchor test
 │                                                                 │
 │  /buy          /pool         /portfolio      /simulate          │
 │  Buy Policy    LP Deposit    My Policies     Demo Flow          │
-└──────┬──────────────┬────────────────────────────┬─────────────┘
+└──────┬──────────────┬────────────────────────────┬──────────────┘
        │ wallet tx    │ REST calls                 │ REST calls
        │              ▼                            ▼
        │  ┌───────────────────┐      ┌────────────────────────┐
        │  │   REST API        │      │   Pricing API          │
-       │  │   Node/Express    │      │   Python FastAPI        │
+       │  │   Node/Express    │      │   Python FastAPI       │
        │  │   port 3001       │      │   port 8000            │
        │  │                   │      │                        │
        │  │  Anchor client    │      │  Flight model          │
@@ -321,14 +321,14 @@ anchor test
 │                       devnet / localnet                          │
 │                                                                  │
 │   RiskPool PDA                    PolicyVault PDA                │
-│   seeds: [pool, auth, type]       seeds: [policy, ph, pool, n]  │
-│   ┌────────────────────┐          ┌───────────────────────┐     │
-│   │ total_liquidity    │          │ payout_amount         │     │
-│   │ total_locked       │◄─lock────│ trigger_condition     │     │
-│   │ premium_accrued    │          │ oracle_pubkey         │     │
-│   │ vault (ATA) ←USDC  │─────────►│ is_claimed ← CEI      │     │
-│   │ lp_token_mint      │          │ expires_at            │     │
-│   └────────────────────┘          └───────────────────────┘     │
+│   seeds: [pool, auth, type]       seeds: [policy, ph, pool, n]   │
+│   ┌────────────────────┐          ┌───────────────────────┐      │
+│   │ total_liquidity    │          │ payout_amount         │      │
+│   │ total_locked       │◄─lock────│ trigger_condition     │      │
+│   │ premium_accrued    │          │ oracle_pubkey         │      │
+│   │ vault (ATA) ←USDC  │─────────►│ is_claimed ← CEI      │      │
+│   │ lp_token_mint      │          │ expires_at            │      │
+│   └────────────────────┘          └───────────────────────┘      │
 │                                                                  │
 │   initialize_pool  fund_pool  create_policy  trigger_payout      │
 │   expire_policy    withdraw_lp  stake_myr  cast_vote             │
