@@ -5,10 +5,10 @@ export const PROGRAM_ID = new PublicKey(
     "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan"
 );
 
-// Devnet USDC
+// Devnet USDC — test mint with admin as mint authority (matches pools on devnet)
 export const USDC_MINT = new PublicKey(
   process.env.NEXT_PUBLIC_USDC_MINT ||
-    "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
+    "HM4vdUJGhAbD44G1CDQ7gx6HFUTvaoCgxtkNPXNfP9jo"
 );
 
 export const RPC_URL =
@@ -29,10 +29,30 @@ export function explorerUrl(tx: string): string {
 }
 
 export const PRICING_API =
-  process.env.NEXT_PUBLIC_PRICING_API || "http://localhost:8000";
+  process.env.NEXT_PUBLIC_PRICING_API || "http://localhost:8001";
 
 export const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+export const USDC_DECIMALS = 1_000_000;
+
+// Canonical names for all coverage types — used across pool, portfolio, simulate, admin pages
+export const COVERAGE_NAMES: Record<number, string> = {
+  0: "Flight Delay ✈",
+  1: "Crop Drought 🌾",
+  2: "Crop Flood 🌊",
+  3: "DeFi Hack 🛡",
+  4: "Stablecoin Depeg",
+  5: "Hurricane 🌀",
+  6: "Hospitalization 🏥",
+};
+
+// comparison values: 0 = value > threshold, 1 = value < threshold, 2 = value == threshold
+export const COMPARISON_LABELS: Record<number, string> = {
+  0: ">",
+  1: "<",
+  2: "==",
+};
 
 export const COVERAGE_TYPES = [
   {
@@ -46,6 +66,7 @@ export const COVERAGE_TYPES = [
     defaultThreshold: 120,
     thresholdLabel: "Delay threshold (minutes)",
     params: ["origin", "destination", "delay_threshold_minutes"],
+    comparison: 0, // oracle value > threshold triggers payout
   },
   {
     id: 1,
@@ -58,6 +79,7 @@ export const COVERAGE_TYPES = [
     defaultThreshold: 20,
     thresholdLabel: "Rainfall threshold (mm)",
     params: ["region", "rainfall_threshold_mm"],
+    comparison: 1, // oracle value < threshold triggers payout
   },
   {
     id: 3,
@@ -70,6 +92,7 @@ export const COVERAGE_TYPES = [
     defaultThreshold: 0,
     thresholdLabel: "Protocol TVL (USD)",
     params: ["protocol_tvl_usd"],
+    comparison: 1, // oracle value < threshold (TVL drops below threshold) triggers payout
   },
 ] as const;
 

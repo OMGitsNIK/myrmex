@@ -23,6 +23,7 @@ export default function ClientProviders({ children }: { children: React.ReactNod
     { href: "/buy", label: "Buy Policy" },
     { href: "/pool", label: "LP Pool" },
     { href: "/portfolio", label: "Portfolio" },
+    { href: "/admin", label: "Admin" },
     { href: "/simulate", label: "Demo" },
   ];
 

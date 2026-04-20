@@ -37,3 +37,5 @@ pricing/.env
 # Test ledger
 test-ledger
 .anchor/test-ledger
+.vercel
+*.db

@@ -32,6 +32,8 @@ router.get("/", async (_req, res) => {
         estimatedApy,
         activePolicies: acc.activePolicyCount.toNumber(),
         isActive: acc.isActive,
+        vault: acc.vault.toBase58(),
+        lpTokenMint: acc.lpTokenMint.toBase58(),
       };
     });
 
