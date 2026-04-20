@@ -12,7 +12,7 @@ pub enum MyrmexError {
     InsufficientLiquidity,
     #[msg("Trigger condition not met")]
     TriggerNotMet,
-    #[msg("Oracle data is stale (>60 seconds old)")]
+    #[msg("Oracle data is stale")]
     StaleOracleData,
     #[msg("Oracle confidence interval too wide")]
     OracleConfidenceTooWide,
@@ -28,4 +28,12 @@ pub enum MyrmexError {
     WithdrawalExceedsAvailable,
     #[msg("Unauthorized")]
     Unauthorized,
+    #[msg("Premium is below the pool's minimum floor")]
+    InsufficientPremium,
+    #[msg("Coverage cap exceeded: pool cannot accept more locked exposure")]
+    CoverageCapExceeded,
+    #[msg("Oracle report is stale — must be posted within the validity window")]
+    OracleReportStale,
+    #[msg("Invalid configuration parameter")]
+    InvalidConfig,
 }

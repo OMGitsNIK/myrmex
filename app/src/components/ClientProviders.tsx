@@ -21,6 +21,7 @@ export default function ClientProviders({ children }: { children: React.ReactNod
 
   const navLinks = [
     { href: "/buy", label: "Buy Policy" },
+    { href: "/claim", label: "Claim" },
     { href: "/pool", label: "LP Pool" },
     { href: "/portfolio", label: "Portfolio" },
     { href: "/admin", label: "Admin" },

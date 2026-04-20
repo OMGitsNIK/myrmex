@@ -24,6 +24,23 @@ pub mod myrmex {
         instructions::initialize_pool::handler(ctx, pool_type, pool_name)
     }
 
+    pub fn initialize_pool_config(
+        ctx: Context<InitializePoolConfig>,
+        oracle_authority: Pubkey,
+        min_premium_bps: u64,
+        max_coverage_bps: u64,
+    ) -> Result<()> {
+        instructions::initialize_pool_config::handler(ctx, oracle_authority, min_premium_bps, max_coverage_bps)
+    }
+
+    pub fn post_oracle_report(
+        ctx: Context<PostOracleReport>,
+        reported_value: i64,
+        description: [u8; 192],
+    ) -> Result<()> {
+        instructions::post_oracle_report::handler(ctx, reported_value, description)
+    }
+
     pub fn fund_pool(ctx: Context<FundPool>, amount: u64) -> Result<()> {
         instructions::fund_pool::handler(ctx, amount)
     }
@@ -52,8 +69,8 @@ pub mod myrmex {
         )
     }
 
-    pub fn trigger_payout(ctx: Context<TriggerPayout>, oracle_value: i64) -> Result<()> {
-        instructions::trigger_payout::handler(ctx, oracle_value)
+    pub fn trigger_payout(ctx: Context<TriggerPayout>) -> Result<()> {
+        instructions::trigger_payout::handler(ctx)
     }
 
     pub fn expire_policy(ctx: Context<ExpirePolicy>) -> Result<()> {

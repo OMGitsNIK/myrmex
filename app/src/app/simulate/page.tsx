@@ -250,14 +250,12 @@ export default function SimulatePage() {
 
       <div className="border border-gray-800 rounded-xl p-6 space-y-3 text-sm text-gray-400">
         <p>
-          <span className="text-white font-medium">What&apos;s happening:</span>{" "}
-          The API calls the on-chain <code className="text-emerald-400">trigger_payout</code> instruction.
-          The smart contract verifies the oracle value against the policy&apos;s trigger condition,
-          marks the policy as claimed, and transfers USDC to the policyholder — all in a single atomic transaction.
+          <span className="text-white font-medium">What&apos;s happening (2 transactions):</span>{" "}
+          First, the oracle service keypair calls <code className="text-emerald-400">post_oracle_report</code> — writing a signed, timestamped value to an on-chain account.
+          Then, <code className="text-emerald-400">trigger_payout</code> reads that account, verifies the value satisfies the trigger condition, and atomically transfers USDC to the policyholder.
         </p>
         <p>
-          <span className="text-white font-medium">No trust required:</span> Anyone can call trigger_payout.
-          The contract enforces all rules on-chain.
+          <span className="text-white font-medium">Why this is secure:</span> The oracle report must be signed by the pool&apos;s registered oracle authority. Anyone can call trigger_payout — but USDC always goes to the policyholder, so front-running is impossible. All logic is enforced on-chain with no trusted intermediary.
         </p>
       </div>
     </div>

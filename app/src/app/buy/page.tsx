@@ -93,8 +93,14 @@ export default function BuyPage() {
         toast.error(`No active pool found for ${selectedType.name}. Ask an admin to initialize one.`);
         return;
       }
+      if (!matchingPool.poolConfig) {
+        toast.error(`${selectedType.name} pool is not configured yet. Contact an admin.`);
+        return;
+      }
       const poolPda = new PublicKey(matchingPool.pubkey);
       const poolAccount = matchingPool;
+      const poolConfigPda = new PublicKey(matchingPool.poolConfig.pubkey);
+      const oracleAuthority = new PublicKey(matchingPool.poolConfig.oracleAuthority);
 
       const nonce = new anchor.BN(Date.now()); // milliseconds for uniqueness
       const [policyPda] = PublicKey.findProgramAddressSync(
@@ -128,7 +134,7 @@ export default function BuyPage() {
       }
 
       const triggerCondition = {
-        oraclePubkey: wallet.publicKey,
+        oraclePubkey: oracleAuthority,   // must match pool_config.oracle_authority
         threshold: new anchor.BN(threshold),
         comparison: selectedType.comparison,
       };
@@ -150,6 +156,7 @@ export default function BuyPage() {
           policyholder: wallet.publicKey,
           policy: policyPda,
           pool: poolPda,
+          poolConfig: poolConfigPda,
           policyholderUsdc,
           poolVault,
           usdcMint: USDC_MINT,

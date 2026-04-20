@@ -4,14 +4,13 @@ use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 use crate::errors::MyrmexError;
 use crate::events::PayoutExecuted;
 use crate::oracle::verify_trigger;
-use crate::state::{PolicyVault, RiskPool};
+use crate::state::{OracleReport, PolicyVault, PoolConfig, RiskPool};
 
 #[derive(Accounts)]
 pub struct TriggerPayout<'info> {
-    /// Only pool authority (admin) may trigger payouts
-    #[account(
-        constraint = caller.key() == pool.authority @ MyrmexError::Unauthorized,
-    )]
+    /// Permissionless — anyone can execute a payout once a valid oracle report exists.
+    /// USDC always goes to policy.policyholder, so front-running is harmless.
+    #[account(mut)]
     pub caller: Signer<'info>,
 
     #[account(
@@ -26,14 +25,26 @@ pub struct TriggerPayout<'info> {
     pub pool: Account<'info, RiskPool>,
 
     #[account(
+        constraint = pool_config.pool == pool.key() @ MyrmexError::Unauthorized,
+    )]
+    pub pool_config: Account<'info, PoolConfig>,
+
+    /// Oracle report posted by the pool's authorized oracle service.
+    /// Seeds: [b"oracle_report", pool.key()] — one canonical report per pool.
+    #[account(
+        seeds = [b"oracle_report", pool.key().as_ref()],
+        bump = oracle_report.bump,
+        constraint = oracle_report.pool == pool.key() @ MyrmexError::WrongOracle,
+        constraint = oracle_report.authority == pool_config.oracle_authority @ MyrmexError::WrongOracle,
+    )]
+    pub oracle_report: Account<'info, OracleReport>,
+
+    #[account(
         mut,
         associated_token::mint = pool.usdc_mint,
         associated_token::authority = policyholder,
     )]
     pub policyholder_usdc: Account<'info, TokenAccount>,
-
-    /// CHECK: Verified inside handler against policy.trigger_condition.oracle_pubkey
-    pub oracle_account: UncheckedAccount<'info>,
 
     #[account(
         mut,
@@ -51,30 +62,36 @@ pub struct TriggerPayout<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<TriggerPayout>, oracle_value: i64) -> Result<()> {
+pub fn handler(ctx: Context<TriggerPayout>) -> Result<()> {
     let clock = Clock::get()?;
 
     // CHECKS
     {
-        let policy = &ctx.accounts.policy;
-        require!(policy.is_active, MyrmexError::PolicyNotActive);
-        require!(!policy.is_claimed, MyrmexError::PolicyAlreadyClaimed);
+        let oracle_report = &ctx.accounts.oracle_report;
 
-        // Verify oracle matches policy
+        // Oracle report must be fresh — protects against stale report replay attacks
+        let age = clock
+            .unix_timestamp
+            .saturating_sub(oracle_report.reported_at);
+        require!(age <= OracleReport::MAX_AGE_SECS, MyrmexError::OracleReportStale);
+
+        let policy = &ctx.accounts.policy;
+
+        // The policy's oracle_pubkey must match the pool's oracle_authority
         require!(
-            ctx.accounts.oracle_account.key() == policy.trigger_condition.oracle_pubkey,
+            policy.trigger_condition.oracle_pubkey == ctx.accounts.pool_config.oracle_authority,
             MyrmexError::WrongOracle
         );
 
-        // Verify trigger condition is met
+        // Verify the oracle's reported value satisfies this policy's trigger condition
         verify_trigger(
-            oracle_value,
+            oracle_report.reported_value,
             policy.trigger_condition.threshold,
             policy.trigger_condition.comparison,
         )?;
     }
 
-    // EFFECTS: Set claimed BEFORE any transfer (checks-effects-interactions)
+    // EFFECTS: Mark claimed BEFORE transfer (CEI pattern — prevents reentrancy)
     {
         let policy = &mut ctx.accounts.policy;
         policy.is_claimed = true;
@@ -82,6 +99,7 @@ pub fn handler(ctx: Context<TriggerPayout>, oracle_value: i64) -> Result<()> {
     }
 
     let payout_amount = ctx.accounts.policy.payout_amount;
+    let oracle_value = ctx.accounts.oracle_report.reported_value;
 
     // INTERACTIONS: Transfer payout from pool vault to policyholder
     let pool_type = ctx.accounts.pool.pool_type;

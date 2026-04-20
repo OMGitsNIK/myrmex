@@ -4,7 +4,7 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
 use crate::errors::MyrmexError;
 use crate::events::PolicyCreated;
-use crate::state::{PolicyVault, RiskPool, TriggerCondition};
+use crate::state::{PolicyVault, PoolConfig, RiskPool, TriggerCondition};
 
 #[derive(Accounts)]
 #[instruction(
@@ -41,6 +41,11 @@ pub struct CreatePolicy<'info> {
     pub pool: Account<'info, RiskPool>,
 
     #[account(
+        constraint = pool_config.pool == pool.key() @ MyrmexError::Unauthorized,
+    )]
+    pub pool_config: Account<'info, PoolConfig>,
+
+    #[account(
         mut,
         associated_token::mint = usdc_mint,
         associated_token::authority = policyholder,
@@ -70,11 +75,43 @@ pub fn handler(
     _nonce: i64,
 ) -> Result<()> {
     let clock = Clock::get()?;
+    let pool_config = &ctx.accounts.pool_config;
 
     require!(
         expires_at > clock.unix_timestamp,
         MyrmexError::PolicyExpired
     );
+
+    // Oracle pubkey must be the pool's authoritative oracle — not the user's wallet
+    require!(
+        trigger_condition.oracle_pubkey == pool_config.oracle_authority,
+        MyrmexError::WrongOracle
+    );
+
+    // Premium must meet the pool's minimum floor (min_premium_bps of payout)
+    let min_premium = payout_amount
+        .checked_mul(pool_config.min_premium_bps)
+        .ok_or(error!(MyrmexError::MathOverflow))?
+        .checked_div(10_000)
+        .ok_or(error!(MyrmexError::MathOverflow))?;
+    require!(premium_amount >= min_premium, MyrmexError::InsufficientPremium);
+
+    // Coverage cap: (locked + new_payout) must not exceed max_coverage_bps% of total_liquidity
+    let new_locked = ctx
+        .accounts
+        .pool
+        .total_locked
+        .checked_add(payout_amount)
+        .ok_or(error!(MyrmexError::MathOverflow))?;
+    let max_locked = ctx
+        .accounts
+        .pool
+        .total_liquidity
+        .checked_mul(pool_config.max_coverage_bps)
+        .ok_or(error!(MyrmexError::MathOverflow))?
+        .checked_div(10_000)
+        .ok_or(error!(MyrmexError::MathOverflow))?;
+    require!(new_locked <= max_locked, MyrmexError::CoverageCapExceeded);
 
     // Transfer premium USDC from policyholder to pool vault
     let transfer_cpi = Transfer {

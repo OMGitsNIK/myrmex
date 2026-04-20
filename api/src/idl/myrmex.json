@@ -122,6 +122,9 @@
           "writable": true
         },
         {
+          "name": "pool_config"
+        },
+        {
           "name": "policyholder_usdc",
           "writable": true,
           "pda": {
@@ -697,6 +700,153 @@
       ]
     },
     {
+      "name": "initialize_pool_config",
+      "discriminator": [
+        35,
+        204,
+        43,
+        107,
+        2,
+        144,
+        229,
+        231
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool"
+        },
+        {
+          "name": "pool_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "oracle_authority",
+          "type": "pubkey"
+        },
+        {
+          "name": "min_premium_bps",
+          "type": "u64"
+        },
+        {
+          "name": "max_coverage_bps",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "post_oracle_report",
+      "discriminator": [
+        82,
+        64,
+        15,
+        7,
+        20,
+        118,
+        212,
+        113
+      ],
+      "accounts": [
+        {
+          "name": "oracle_authority",
+          "docs": [
+            "The oracle authority — must match pool_config.oracle_authority"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool"
+        },
+        {
+          "name": "pool_config"
+        },
+        {
+          "name": "oracle_report",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  97,
+                  99,
+                  108,
+                  101,
+                  95,
+                  114,
+                  101,
+                  112,
+                  111,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "reported_value",
+          "type": "i64"
+        },
+        {
+          "name": "description",
+          "type": {
+            "array": [
+              "u8",
+              192
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "stake_myr",
       "discriminator": [
         45,
@@ -955,8 +1105,10 @@
         {
           "name": "caller",
           "docs": [
-            "Only pool authority (admin) may trigger payouts"
+            "Permissionless — anyone can execute a payout once a valid oracle report exists.",
+            "USDC always goes to policy.policyholder, so front-running is harmless."
           ],
+          "writable": true,
           "signer": true
         },
         {
@@ -966,6 +1118,42 @@
         {
           "name": "pool",
           "writable": true
+        },
+        {
+          "name": "pool_config"
+        },
+        {
+          "name": "oracle_report",
+          "docs": [
+            "Oracle report posted by the pool's authorized oracle service.",
+            "Seeds: [b\"oracle_report\", pool.key()] — one canonical report per pool."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  97,
+                  99,
+                  108,
+                  101,
+                  95,
+                  114,
+                  101,
+                  112,
+                  111,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
         },
         {
           "name": "policyholder_usdc",
@@ -1059,9 +1247,6 @@
           }
         },
         {
-          "name": "oracle_account"
-        },
-        {
           "name": "pool_vault",
           "writable": true
         },
@@ -1077,12 +1262,7 @@
           "address": "11111111111111111111111111111111"
         }
       ],
-      "args": [
-        {
-          "name": "oracle_value",
-          "type": "i64"
-        }
-      ]
+      "args": []
     },
     {
       "name": "withdraw_lp",
@@ -1331,6 +1511,19 @@
       ]
     },
     {
+      "name": "OracleReport",
+      "discriminator": [
+        72,
+        98,
+        174,
+        167,
+        90,
+        119,
+        146,
+        220
+      ]
+    },
+    {
       "name": "PolicyVault",
       "discriminator": [
         180,
@@ -1341,6 +1534,19 @@
         214,
         158,
         120
+      ]
+    },
+    {
+      "name": "PoolConfig",
+      "discriminator": [
+        26,
+        108,
+        14,
+        123,
+        116,
+        230,
+        129,
+        43
       ]
     },
     {
@@ -1466,7 +1672,7 @@
     {
       "code": 6005,
       "name": "StaleOracleData",
-      "msg": "Oracle data is stale (>60 seconds old)"
+      "msg": "Oracle data is stale"
     },
     {
       "code": 6006,
@@ -1502,6 +1708,26 @@
       "code": 6012,
       "name": "Unauthorized",
       "msg": "Unauthorized"
+    },
+    {
+      "code": 6013,
+      "name": "InsufficientPremium",
+      "msg": "Premium is below the pool's minimum floor"
+    },
+    {
+      "code": 6014,
+      "name": "CoverageCapExceeded",
+      "msg": "Coverage cap exceeded: pool cannot accept more locked exposure"
+    },
+    {
+      "code": 6015,
+      "name": "OracleReportStale",
+      "msg": "Oracle report is stale — must be posted within the validity window"
+    },
+    {
+      "code": 6016,
+      "name": "InvalidConfig",
+      "msg": "Invalid configuration parameter"
     }
   ],
   "types": [
@@ -1574,6 +1800,58 @@
           {
             "name": "lp_tokens_burned",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OracleReport",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "docs": [
+              "Must match pool_config.oracle_authority — only this keypair can post reports"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "pool",
+            "docs": [
+              "Which pool this report is for"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "reported_value",
+            "docs": [
+              "The verified oracle value (e.g. rainfall mm, delay minutes, TVL in USD)"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "reported_at",
+            "docs": [
+              "Unix timestamp when this report was posted"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "description",
+            "docs": [
+              "Human-readable description of the verified event (for audit trail)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                192
+              ]
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
           }
         ]
       }
@@ -1710,6 +1988,40 @@
           {
             "name": "is_claimed",
             "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PoolConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "oracle_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "min_premium_bps",
+            "docs": [
+              "Minimum premium in basis points of payout amount (e.g. 500 = 5%)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "max_coverage_bps",
+            "docs": [
+              "Maximum coverage ratio in basis points of total_liquidity (e.g. 8000 = 80%)"
+            ],
+            "type": "u64"
           },
           {
             "name": "bump",
