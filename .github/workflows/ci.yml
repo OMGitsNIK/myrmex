@@ -48,12 +48,11 @@ jobs:
           cache: 'yarn'
       - name: Install dependencies
         run: yarn install --frozen-lockfile
-      - name: Install Solana
-        uses: mbund/setup-solana@v1
-      - name: Install Anchor
-        uses: coral-xyz/anchor-lang-action@v0.32.1
+      - name: Install Solana and Anchor
+        uses: metadaoproject/setup-anchor@v3.1
         with:
-          anchor-version: '0.32.1'
+          anchor-version: "0.32.1"
+          solana-cli-version: "1.18.26"
       - name: Run Anchor Test
         run: anchor test
 
@@ -88,7 +87,7 @@ jobs:
         run: npm ci
       - name: Run ESLint
         run: npm run lint
-      - name: Run TypeScript typecheck
-        run: npm run typecheck
       - name: Build Website (Next.js)
         run: npm run build
+      - name: Run TypeScript typecheck
+        run: npm run typecheck
