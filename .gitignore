@@ -21,7 +21,6 @@ app/node_modules
 
 # API
 api/node_modules
-api/dist
 
 # Secrets — NEVER commit these
 .env

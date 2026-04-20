@@ -1,0 +1,35 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = __importDefault(require("express"));
+const cors_1 = __importDefault(require("cors"));
+const dotenv_1 = __importDefault(require("dotenv"));
+dotenv_1.default.config();
+const policies_1 = require("./routes/policies");
+const policy_1 = require("./routes/policy");
+const pools_1 = require("./routes/pools");
+const simulate_1 = require("./routes/simulate");
+const quote_1 = require("./routes/quote");
+const stats_1 = require("./routes/stats");
+const oracle_1 = require("./routes/oracle");
+const indexer_service_1 = require("./services/indexer.service");
+const cron_service_1 = require("./services/cron.service");
+const app = (0, express_1.default)();
+app.use((0, cors_1.default)());
+app.use(express_1.default.json());
+app.use("/api/policies", policies_1.policyRouter);
+app.use("/api/policy", policy_1.policyByPubkeyRouter);
+app.use("/api/pools", pools_1.poolRouter);
+app.use("/api/simulate-trigger", simulate_1.simulateRouter);
+app.use("/api/quote", quote_1.quoteRouter);
+app.use("/api/stats", stats_1.statsRouter);
+app.use("/api/oracle-report", oracle_1.oracleRouter);
+app.get("/health", (_, res) => res.json({ status: "ok", service: "myrmex-api" }));
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+    console.log(`MYRMEX API running on port ${PORT}`);
+    (0, indexer_service_1.startIndexer)();
+    (0, cron_service_1.startCron)();
+});

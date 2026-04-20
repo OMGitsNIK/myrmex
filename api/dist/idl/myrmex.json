@@ -1,0 +1,2167 @@
+{
+  "address": "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan",
+  "metadata": {
+    "name": "myrmex",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "MYRMEX - Decentralized Parametric Insurance Protocol"
+  },
+  "instructions": [
+    {
+      "name": "cast_vote",
+      "discriminator": [
+        20,
+        212,
+        15,
+        189,
+        69,
+        180,
+        69,
+        151
+      ],
+      "accounts": [
+        {
+          "name": "voter",
+          "signer": true
+        },
+        {
+          "name": "stake_account"
+        },
+        {
+          "name": "proposal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  112,
+                  111,
+                  115,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "proposal_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "proposal_id",
+          "type": "u64"
+        },
+        {
+          "name": "vote",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "create_policy",
+      "discriminator": [
+        27,
+        81,
+        33,
+        27,
+        196,
+        103,
+        246,
+        53
+      ],
+      "accounts": [
+        {
+          "name": "policyholder",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "policy",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "policyholder"
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool",
+          "writable": true
+        },
+        {
+          "name": "pool_config"
+        },
+        {
+          "name": "policyholder_usdc",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "policyholder"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "usdc_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "pool_vault",
+          "writable": true
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "coverage_type",
+          "type": "u8"
+        },
+        {
+          "name": "payout_amount",
+          "type": "u64"
+        },
+        {
+          "name": "premium_amount",
+          "type": "u64"
+        },
+        {
+          "name": "trigger_condition",
+          "type": {
+            "defined": {
+              "name": "TriggerCondition"
+            }
+          }
+        },
+        {
+          "name": "expires_at",
+          "type": "i64"
+        },
+        {
+          "name": "nonce",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "expire_policy",
+      "discriminator": [
+        149,
+        24,
+        43,
+        100,
+        240,
+        50,
+        39,
+        124
+      ],
+      "accounts": [
+        {
+          "name": "caller",
+          "docs": [
+            "Anyone can call (keeper/cron incentive)"
+          ],
+          "signer": true
+        },
+        {
+          "name": "policy",
+          "writable": true
+        },
+        {
+          "name": "pool",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "fund_pool",
+      "discriminator": [
+        36,
+        57,
+        233,
+        176,
+        181,
+        20,
+        87,
+        159
+      ],
+      "accounts": [
+        {
+          "name": "provider",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "writable": true
+        },
+        {
+          "name": "provider_usdc",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "provider"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.usdc_mint",
+                "account": "RiskPool"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "pool_vault",
+          "writable": true
+        },
+        {
+          "name": "lp_token_mint",
+          "writable": true
+        },
+        {
+          "name": "provider_lp_tokens",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "provider"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lp_token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initialize_pool",
+      "discriminator": [
+        95,
+        180,
+        10,
+        172,
+        84,
+        174,
+        232,
+        40
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "writable": true
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "pool"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "usdc_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "lp_token_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  109,
+                  105,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "pool_type",
+          "type": "u8"
+        },
+        {
+          "name": "pool_name",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize_pool_config",
+      "discriminator": [
+        35,
+        204,
+        43,
+        107,
+        2,
+        144,
+        229,
+        231
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool"
+        },
+        {
+          "name": "pool_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "oracle_authority",
+          "type": "pubkey"
+        },
+        {
+          "name": "min_premium_bps",
+          "type": "u64"
+        },
+        {
+          "name": "max_coverage_bps",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "post_oracle_report",
+      "discriminator": [
+        82,
+        64,
+        15,
+        7,
+        20,
+        118,
+        212,
+        113
+      ],
+      "accounts": [
+        {
+          "name": "oracle_authority",
+          "docs": [
+            "The oracle authority — must match pool_config.oracle_authority"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool"
+        },
+        {
+          "name": "pool_config"
+        },
+        {
+          "name": "oracle_report",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  97,
+                  99,
+                  108,
+                  101,
+                  95,
+                  114,
+                  101,
+                  112,
+                  111,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "reported_value",
+          "type": "i64"
+        },
+        {
+          "name": "description",
+          "type": {
+            "array": [
+              "u8",
+              192
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "stake_myr",
+      "discriminator": [
+        45,
+        227,
+        223,
+        119,
+        1,
+        192,
+        200,
+        44
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "stake_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "myr_mint"
+        },
+        {
+          "name": "owner_myr",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "myr_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "stake_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "stake_account"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "myr_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "trigger_payout",
+      "discriminator": [
+        145,
+        81,
+        98,
+        96,
+        194,
+        251,
+        69,
+        38
+      ],
+      "accounts": [
+        {
+          "name": "caller",
+          "docs": [
+            "Permissionless — anyone can execute a payout once a valid oracle report exists.",
+            "USDC always goes to policy.policyholder, so front-running is harmless."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "policy",
+          "writable": true
+        },
+        {
+          "name": "pool",
+          "writable": true
+        },
+        {
+          "name": "pool_config"
+        },
+        {
+          "name": "oracle_report",
+          "docs": [
+            "Oracle report posted by the pool's authorized oracle service.",
+            "Seeds: [b\"oracle_report\", pool.key()] — one canonical report per pool."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  97,
+                  99,
+                  108,
+                  101,
+                  95,
+                  114,
+                  101,
+                  112,
+                  111,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "policyholder_usdc",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "policyholder"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.usdc_mint",
+                "account": "RiskPool"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "pool_vault",
+          "writable": true
+        },
+        {
+          "name": "policyholder"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "withdraw_lp",
+      "discriminator": [
+        225,
+        221,
+        45,
+        211,
+        49,
+        60,
+        51,
+        163
+      ],
+      "accounts": [
+        {
+          "name": "provider",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "writable": true
+        },
+        {
+          "name": "provider_usdc",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "provider"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.usdc_mint",
+                "account": "RiskPool"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "pool_vault",
+          "writable": true
+        },
+        {
+          "name": "lp_token_mint",
+          "writable": true
+        },
+        {
+          "name": "provider_lp_tokens",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "provider"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lp_token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "lp_amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "GovernanceProposal",
+      "discriminator": [
+        53,
+        107,
+        240,
+        190,
+        43,
+        73,
+        65,
+        143
+      ]
+    },
+    {
+      "name": "OracleReport",
+      "discriminator": [
+        72,
+        98,
+        174,
+        167,
+        90,
+        119,
+        146,
+        220
+      ]
+    },
+    {
+      "name": "PolicyVault",
+      "discriminator": [
+        180,
+        22,
+        67,
+        48,
+        87,
+        214,
+        158,
+        120
+      ]
+    },
+    {
+      "name": "PoolConfig",
+      "discriminator": [
+        26,
+        108,
+        14,
+        123,
+        116,
+        230,
+        129,
+        43
+      ]
+    },
+    {
+      "name": "RiskPool",
+      "discriminator": [
+        101,
+        46,
+        90,
+        100,
+        248,
+        9,
+        6,
+        213
+      ]
+    },
+    {
+      "name": "StakeAccount",
+      "discriminator": [
+        80,
+        158,
+        67,
+        124,
+        50,
+        189,
+        192,
+        255
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "LpWithdrawn",
+      "discriminator": [
+        188,
+        10,
+        43,
+        60,
+        223,
+        238,
+        51,
+        153
+      ]
+    },
+    {
+      "name": "PayoutExecuted",
+      "discriminator": [
+        88,
+        83,
+        101,
+        64,
+        188,
+        233,
+        117,
+        185
+      ]
+    },
+    {
+      "name": "PolicyCreated",
+      "discriminator": [
+        59,
+        189,
+        65,
+        121,
+        86,
+        157,
+        108,
+        10
+      ]
+    },
+    {
+      "name": "PolicyExpired",
+      "discriminator": [
+        165,
+        34,
+        27,
+        82,
+        79,
+        188,
+        9,
+        244
+      ]
+    },
+    {
+      "name": "PoolFunded",
+      "discriminator": [
+        164,
+        221,
+        242,
+        68,
+        164,
+        64,
+        24,
+        214
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "PolicyExpired",
+      "msg": "Policy has expired"
+    },
+    {
+      "code": 6001,
+      "name": "PolicyNotActive",
+      "msg": "Policy is not active"
+    },
+    {
+      "code": 6002,
+      "name": "PolicyAlreadyClaimed",
+      "msg": "Policy has already been claimed"
+    },
+    {
+      "code": 6003,
+      "name": "InsufficientLiquidity",
+      "msg": "Insufficient pool liquidity for this policy"
+    },
+    {
+      "code": 6004,
+      "name": "TriggerNotMet",
+      "msg": "Trigger condition not met"
+    },
+    {
+      "code": 6005,
+      "name": "StaleOracleData",
+      "msg": "Oracle data is stale"
+    },
+    {
+      "code": 6006,
+      "name": "OracleConfidenceTooWide",
+      "msg": "Oracle confidence interval too wide"
+    },
+    {
+      "code": 6007,
+      "name": "WrongOracle",
+      "msg": "Wrong oracle provided for this policy"
+    },
+    {
+      "code": 6008,
+      "name": "PolicyNotExpired",
+      "msg": "Policy has not yet expired"
+    },
+    {
+      "code": 6009,
+      "name": "MathOverflow",
+      "msg": "Math overflow in calculation"
+    },
+    {
+      "code": 6010,
+      "name": "PoolNotActive",
+      "msg": "Pool is not active"
+    },
+    {
+      "code": 6011,
+      "name": "WithdrawalExceedsAvailable",
+      "msg": "Withdrawal exceeds available liquidity"
+    },
+    {
+      "code": 6012,
+      "name": "Unauthorized",
+      "msg": "Unauthorized"
+    },
+    {
+      "code": 6013,
+      "name": "InsufficientPremium",
+      "msg": "Premium is below the pool's minimum floor"
+    },
+    {
+      "code": 6014,
+      "name": "CoverageCapExceeded",
+      "msg": "Coverage cap exceeded: pool cannot accept more locked exposure"
+    },
+    {
+      "code": 6015,
+      "name": "OracleReportStale",
+      "msg": "Oracle report is stale — must be posted within the validity window"
+    },
+    {
+      "code": 6016,
+      "name": "InvalidConfig",
+      "msg": "Invalid configuration parameter"
+    }
+  ],
+  "types": [
+    {
+      "name": "GovernanceProposal",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "proposer",
+            "type": "pubkey"
+          },
+          {
+            "name": "description",
+            "type": {
+              "array": [
+                "u8",
+                128
+              ]
+            }
+          },
+          {
+            "name": "votes_for",
+            "type": "u64"
+          },
+          {
+            "name": "votes_against",
+            "type": "u64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "voting_ends_at",
+            "type": "i64"
+          },
+          {
+            "name": "executed",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LpWithdrawn",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "provider",
+            "type": "pubkey"
+          },
+          {
+            "name": "usdc_returned",
+            "type": "u64"
+          },
+          {
+            "name": "lp_tokens_burned",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OracleReport",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "docs": [
+              "Must match pool_config.oracle_authority — only this keypair can post reports"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "pool",
+            "docs": [
+              "Which pool this report is for"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "reported_value",
+            "docs": [
+              "The verified oracle value (e.g. rainfall mm, delay minutes, TVL in USD)"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "reported_at",
+            "docs": [
+              "Unix timestamp when this report was posted"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "description",
+            "docs": [
+              "Human-readable description of the verified event (for audit trail)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                192
+              ]
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PayoutExecuted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "policy",
+            "type": "pubkey"
+          },
+          {
+            "name": "policyholder",
+            "type": "pubkey"
+          },
+          {
+            "name": "payout_amount",
+            "type": "u64"
+          },
+          {
+            "name": "oracle_value",
+            "type": "i64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PolicyCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "policy",
+            "type": "pubkey"
+          },
+          {
+            "name": "policyholder",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "coverage_type",
+            "type": "u8"
+          },
+          {
+            "name": "payout_amount",
+            "type": "u64"
+          },
+          {
+            "name": "premium_amount",
+            "type": "u64"
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PolicyExpired",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "policy",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "premium_distributed",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PolicyVault",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "policyholder",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "coverage_type",
+            "type": "u8"
+          },
+          {
+            "name": "payout_amount",
+            "type": "u64"
+          },
+          {
+            "name": "premium_amount",
+            "type": "u64"
+          },
+          {
+            "name": "trigger_condition",
+            "type": {
+              "defined": {
+                "name": "TriggerCondition"
+              }
+            }
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "is_active",
+            "type": "bool"
+          },
+          {
+            "name": "is_claimed",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PoolConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "oracle_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "min_premium_bps",
+            "docs": [
+              "Minimum premium in basis points of payout amount (e.g. 500 = 5%)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "max_coverage_bps",
+            "docs": [
+              "Maximum coverage ratio in basis points of total_liquidity (e.g. 8000 = 80%)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PoolFunded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "provider",
+            "type": "pubkey"
+          },
+          {
+            "name": "usdc_amount",
+            "type": "u64"
+          },
+          {
+            "name": "lp_tokens_minted",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RiskPool",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool_type",
+            "type": "u8"
+          },
+          {
+            "name": "pool_name",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "usdc_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "lp_token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_liquidity",
+            "type": "u64"
+          },
+          {
+            "name": "total_locked",
+            "type": "u64"
+          },
+          {
+            "name": "premium_accrued",
+            "type": "u64"
+          },
+          {
+            "name": "active_policy_count",
+            "type": "u64"
+          },
+          {
+            "name": "is_active",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakeAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount_staked",
+            "type": "u64"
+          },
+          {
+            "name": "staked_at",
+            "type": "i64"
+          },
+          {
+            "name": "lock_until",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TriggerCondition",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "oracle_pubkey",
+            "type": "pubkey"
+          },
+          {
+            "name": "threshold",
+            "type": "i64"
+          },
+          {
+            "name": "comparison",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}
