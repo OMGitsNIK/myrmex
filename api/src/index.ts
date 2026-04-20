@@ -26,7 +26,7 @@ app.use("/api/stats", statsRouter);
 app.use("/api/oracle-report", oracleRouter);
 
 app.get("/health", (_, res) =>
-  res.json({ status: "ok", service: "myrmex-api" })
+  res.json({ status: "ok", service: "myrmex-api", version: "2.0-oracle" })
 );
 
 const PORT = process.env.PORT || 3001;

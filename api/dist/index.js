@@ -26,7 +26,7 @@ app.use("/api/simulate-trigger", simulate_1.simulateRouter);
 app.use("/api/quote", quote_1.quoteRouter);
 app.use("/api/stats", stats_1.statsRouter);
 app.use("/api/oracle-report", oracle_1.oracleRouter);
-app.get("/health", (_, res) => res.json({ status: "ok", service: "myrmex-api" }));
+app.get("/health", (_, res) => res.json({ status: "ok", service: "myrmex-api", version: "2.0-oracle" }));
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
     console.log(`MYRMEX API running on port ${PORT}`);
