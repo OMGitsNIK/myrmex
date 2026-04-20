@@ -84,7 +84,7 @@ jobs:
           cache: 'npm'
           cache-dependency-path: './app/package-lock.json'
       - name: Install dependencies
-        run: npm ci
+        run: npm install --legacy-peer-deps
       - name: Run ESLint
         run: npm run lint
       - name: Build Website (Next.js)
