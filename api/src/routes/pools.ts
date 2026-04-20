@@ -63,6 +63,7 @@ router.get("/", async (_req, res) => {
           activePolicies: acc.activePolicyCount.toNumber(),
           isActive: acc.isActive,
           vault: acc.vault.toBase58(),
+          usdcMint: acc.usdcMint.toBase58(),
           lpTokenMint: acc.lpTokenMint.toBase58(),
           poolConfig,
         };
