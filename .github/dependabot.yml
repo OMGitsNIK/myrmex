@@ -12,3 +12,7 @@ updates:
     directory: "/app"
     schedule:
       interval: "weekly"
+  - package-ecosystem: "npm"
+    directory: "/api"
+    schedule:
+      interval: "weekly"

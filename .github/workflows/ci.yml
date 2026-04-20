@@ -32,10 +32,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
       - name: Audit Rust Dependencies
-        uses: actions-rs/audit-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+        run: cargo audit
 
   anchor-test:
     runs-on: ubuntu-latest
@@ -51,7 +51,7 @@ jobs:
       - name: Install Solana and Anchor
         uses: metadaoproject/setup-anchor@v3.1
         with:
-          anchor-version: "0.31.2"
+          anchor-version: "0.32.1"
           solana-cli-version: "1.18.26"
       - name: Run Anchor Test
         run: anchor test
