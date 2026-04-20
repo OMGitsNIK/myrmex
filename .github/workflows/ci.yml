@@ -51,7 +51,7 @@ jobs:
       - name: Install Solana and Anchor
         uses: metadaoproject/setup-anchor@v3.1
         with:
-          anchor-version: "0.32.1"
+          anchor-version: "0.31.2"
           solana-cli-version: "1.18.26"
       - name: Run Anchor Test
         run: anchor test
