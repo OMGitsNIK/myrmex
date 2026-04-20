@@ -15,7 +15,7 @@ myrmex = "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

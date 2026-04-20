@@ -24,12 +24,18 @@ export interface Quote {
 }
 
 // Local actuarial fallback used when the pricing API is unreachable.
-// Rates are conservative estimates per coverage type.
 function localFallbackQuote(params: QuoteRequest): Quote {
   const base: Record<string, number> = {
-    flight_delay: 0.025,
-    crop_drought: 0.045,
-    defi_hack: 0.06,
+    earthquake:        0.010,
+    flood:             0.015,
+    crop_multifactor:  0.025,
+    hurricane:         0.030,
+    stablecoin_depeg:  0.003,
+    bridge_hack:       0.020,
+    // legacy
+    flight_delay:      0.025,
+    crop_drought:      0.045,
+    defi_hack:         0.060,
   };
   const rate = base[params.coverage_type] ?? 0.03;
   const durationFactor = Math.min(params.duration_days / 30, 3);

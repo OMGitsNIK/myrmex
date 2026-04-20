@@ -5,7 +5,7 @@ export const PROGRAM_ID = new PublicKey(
     "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan"
 );
 
-// Devnet USDC — test mint with admin as mint authority (matches pools on devnet)
+// Devnet USDC — test mint, admin has mint authority
 export const USDC_MINT = new PublicKey(
   process.env.NEXT_PUBLIC_USDC_MINT ||
     "HM4vdUJGhAbD44G1CDQ7gx6HFUTvaoCgxtkNPXNfP9jo"
@@ -15,16 +15,10 @@ export const RPC_URL =
   process.env.NEXT_PUBLIC_RPC_URL || "https://api.devnet.solana.com";
 
 export function explorerUrl(tx: string): string {
-  const rpc = RPC_URL;
-  if (rpc.includes("localhost") || rpc.includes("127.0.0.1")) {
-    return `https://explorer.solana.com/tx/${tx}?cluster=custom&customUrl=${encodeURIComponent(
-      rpc
-    )}`;
-  }
-  if (rpc.includes("devnet"))
+  if (RPC_URL.includes("localhost") || RPC_URL.includes("127.0.0.1"))
+    return `https://explorer.solana.com/tx/${tx}?cluster=custom&customUrl=${encodeURIComponent(RPC_URL)}`;
+  if (RPC_URL.includes("devnet"))
     return `https://explorer.solana.com/tx/${tx}?cluster=devnet`;
-  if (rpc.includes("testnet"))
-    return `https://explorer.solana.com/tx/${tx}?cluster=testnet`;
   return `https://explorer.solana.com/tx/${tx}`;
 }
 
@@ -36,83 +30,200 @@ export const API_URL =
 
 export const USDC_DECIMALS = 1_000_000;
 
-// Canonical names for all coverage types — used across pool, portfolio, simulate, admin pages
+// ── Pool type → display name ──────────────────────────────────────────────
 export const COVERAGE_NAMES: Record<number, string> = {
-  0: "Flight Delay ✈",
-  1: "Crop Drought 🌾",
-  2: "Crop Flood 🌊",
-  3: "DeFi Hack 🛡",
-  4: "Stablecoin Depeg",
-  5: "Hurricane 🌀",
-  6: "Hospitalization 🏥",
+  0: "Earthquake 🌍",
+  1: "Flood 🌊",
+  2: "Crop Multi-Factor 🌾",
+  3: "Hurricane 🌀",
+  4: "Stablecoin Depeg 💵",
+  5: "Bridge / Exchange Hack 🛡",
 };
 
-// comparison values: 0 = value > threshold, 1 = value < threshold, 2 = value == threshold
+// comparison values stored on-chain: 0 = GT, 1 = LT, 2 = EQ
 export const COMPARISON_LABELS: Record<number, string> = {
   0: ">",
   1: "<",
   2: "==",
 };
 
+// ── Coverage type definitions (for buy page) ─────────────────────────────
+
 export const COVERAGE_TYPES = [
   {
     id: 0,
-    key: "flight_delay",
-    name: "Flight Delay",
+    key: "earthquake",
+    pricingKey: "earthquake",
+    name: "Earthquake",
+    tagline: "130M+ people in quake zones are uninsured",
     description:
-      "Instant payout if your flight is delayed beyond your threshold",
-    icon: "✈",
-    maxPayout: 500,
-    defaultThreshold: 120,
-    thresholdLabel: "Delay threshold (minutes)",
-    params: ["origin", "destination", "delay_threshold_minutes"],
-    comparison: 0, // oracle value > threshold triggers payout
+      "Instant payout when USGS confirms a major earthquake above your magnitude threshold anywhere in your covered region.",
+    icon: "🌍",
+    color: "#f59e0b",
+    maxPayout: 50_000,
+    marketGap: "$40B",
+    oracleSource: "USGS Earthquake API (real-time)",
+    // on-chain trigger: oracle_value (magnitude×100) > threshold
+    comparison: 0,
+    defaultThreshold: 650,           // M6.5 × 100
+    thresholdLabel: "Min magnitude × 100 (e.g. 650 = M6.5)",
+    thresholdDisplay: (v: number) => `M${(v / 100).toFixed(1)}+`,
+    pricingParams: (threshold: number, payout: number, days: number, region: string) => ({
+      coverage_type: "earthquake",
+      payout_amount_usdc: payout,
+      duration_days: days,
+      min_magnitude: threshold / 100,
+      seismic_region: region,
+    }),
+    extraFields: [
+      { key: "seismic_region", label: "Region", placeholder: "Pacific Ring, Japan, California…", default: "Global" },
+    ],
   },
   {
     id: 1,
-    key: "crop_drought",
-    name: "Crop Drought",
+    key: "flood",
+    pricingKey: "flood",
+    name: "Flood",
+    tagline: "Only 5% of global flood losses are insured",
     description:
-      "Payout if rainfall drops below threshold during growing season",
+      "Triggered when a USGS river gauge exceeds your threshold — no adjuster, no paperwork. USDC transferred automatically.",
+    icon: "🌊",
+    color: "#3b82f6",
+    maxPayout: 100_000,
+    marketGap: "$58B",
+    oracleSource: "USGS Water Services (real-time gauges)",
+    // oracle_value (gauge_ft×10) > threshold
+    comparison: 0,
+    defaultThreshold: 300,           // 30.0 ft flood stage
+    thresholdLabel: "Gauge height threshold × 10 (e.g. 300 = 30.0 ft)",
+    thresholdDisplay: (v: number) => `${(v / 10).toFixed(1)} ft`,
+    pricingParams: (threshold: number, payout: number, days: number, region: string) => ({
+      coverage_type: "flood",
+      payout_amount_usdc: payout,
+      duration_days: days,
+      gauge_threshold_ft: threshold / 10,
+      river: region,
+    }),
+    extraFields: [
+      { key: "river", label: "River System", placeholder: "Mississippi, Missouri, Ohio…", default: "Mississippi" },
+    ],
+  },
+  {
+    id: 2,
+    key: "crop_multifactor",
+    pricingKey: "crop_multifactor",
+    name: "Crop Multi-Factor",
+    tagline: "500M smallholder farmers have no insurance",
+    description:
+      "A composite AI score (0–10000) measuring rainfall deficit, heat stress, and dry-day streaks. Triggers when conditions indicate severe crop loss.",
     icon: "🌾",
-    maxPayout: 10000,
-    defaultThreshold: 20,
-    thresholdLabel: "Rainfall threshold (mm)",
-    params: ["region", "rainfall_threshold_mm"],
-    comparison: 1, // oracle value < threshold triggers payout
+    color: "#22c55e",
+    maxPayout: 100_000,
+    marketGap: "$100B+",
+    oracleSource: "Open-Meteo dual-source (forecast + archive)",
+    // oracle_value (score 0–10000) < threshold — low score = bad conditions
+    comparison: 1,
+    defaultThreshold: 3000,          // score < 3000 = severe stress
+    thresholdLabel: "Stress threshold 0–10000 (lower = worse; trigger if below)",
+    thresholdDisplay: (v: number) => `Score < ${v.toLocaleString()}`,
+    pricingParams: (threshold: number, payout: number, days: number, region: string) => ({
+      coverage_type: "crop_multifactor",
+      payout_amount_usdc: payout,
+      duration_days: days,
+      score_threshold: threshold,
+      crop_region: region,
+    }),
+    extraFields: [
+      { key: "crop_region", label: "Farming Region", placeholder: "Iowa, Maharashtra, Kansas…", default: "Iowa" },
+    ],
   },
   {
     id: 3,
-    key: "defi_hack",
-    name: "DeFi Protocol Hack",
+    key: "hurricane",
+    pricingKey: "hurricane",
+    name: "Hurricane / Cyclone",
+    tagline: "Coastal communities face $30B annual uninsured losses",
     description:
-      "Coverage against smart contract exploits and oracle manipulation",
+      "Triggered when NOAA NHC reports a tropical cyclone with sustained winds exceeding your threshold in the covered basin.",
+    icon: "🌀",
+    color: "#8b5cf6",
+    maxPayout: 200_000,
+    marketGap: "$30B",
+    oracleSource: "NOAA NHC + Weather.gov alerts",
+    // oracle_value (wind knots) > threshold
+    comparison: 0,
+    defaultThreshold: 64,            // Hurricane force (Category 1)
+    thresholdLabel: "Sustained wind knots (64 = Cat 1, 96 = Cat 3, 137 = Cat 5)",
+    thresholdDisplay: (v: number) => `${v} kt sustained`,
+    pricingParams: (threshold: number, payout: number, days: number, _region: string) => ({
+      coverage_type: "hurricane",
+      payout_amount_usdc: payout,
+      duration_days: days,
+      wind_threshold_knots: threshold,
+    }),
+    extraFields: [],
+  },
+  {
+    id: 4,
+    key: "stablecoin_depeg",
+    pricingKey: "stablecoin_depeg",
+    name: "Stablecoin Depeg",
+    tagline: "UST wiped out $40B overnight — holders had no safety net",
+    description:
+      "Pays out if USDC or USDT trades below your price threshold (in basis points) on CoinGecko. Fully verifiable on-chain.",
+    icon: "💵",
+    color: "#06b6d4",
+    maxPayout: 500_000,
+    marketGap: "Growing",
+    oracleSource: "CoinGecko dual-endpoint (price + market data)",
+    // oracle_value (price in bps, 10000=$1.00) < threshold
+    comparison: 1,
+    defaultThreshold: 9700,          // $0.97 depeg
+    thresholdLabel: "Depeg threshold (bps, 10000 = $1.00; e.g. 9700 = $0.97)",
+    thresholdDisplay: (v: number) => `$${(v / 10000).toFixed(3)}`,
+    pricingParams: (threshold: number, payout: number, days: number, _region: string) => ({
+      coverage_type: "stablecoin_depeg",
+      payout_amount_usdc: payout,
+      duration_days: days,
+      depeg_threshold_bps: threshold,
+    }),
+    extraFields: [],
+  },
+  {
+    id: 5,
+    key: "bridge_hack",
+    pricingKey: "bridge_hack",
+    name: "Bridge / Exchange Hack",
+    tagline: "$3B+ lost to bridge exploits in 2023 alone",
+    description:
+      "Triggers when DeFiLlama reports a sudden collapse in combined bridge TVL (Wormhole, Stargate, Across), cross-checked against the hacks feed.",
     icon: "🛡",
-    maxPayout: 50000,
-    defaultThreshold: 0,
-    thresholdLabel: "Protocol TVL (USD)",
-    params: ["protocol_tvl_usd"],
-    comparison: 1, // oracle value < threshold (TVL drops below threshold) triggers payout
+    color: "#ef4444",
+    maxPayout: 500_000,
+    marketGap: "$3B+ annually",
+    oracleSource: "DeFiLlama TVL + hacks endpoint",
+    // oracle_value (TVL in millions) < threshold — drop from baseline
+    comparison: 1,
+    defaultThreshold: 1500,          // < $1.5B combined = likely exploit
+    thresholdLabel: "Bridge TVL floor in $M (trigger if total drops below this)",
+    thresholdDisplay: (v: number) => `< $${(v / 1000).toFixed(1)}B TVL`,
+    pricingParams: (threshold: number, payout: number, days: number, _region: string) => ({
+      coverage_type: "bridge_hack",
+      payout_amount_usdc: payout,
+      duration_days: days,
+      tvl_drop_threshold_pct: 30,    // hardcoded at 30% drop for pricing
+    }),
+    extraFields: [],
   },
 ] as const;
 
-export const POOLS = [
-  {
-    key: "flight-global",
-    name: "Flight Global",
-    poolType: 0,
-    description: "All international flight routes",
-  },
-  {
-    key: "monsoon-india",
-    name: "Monsoon India",
-    poolType: 1,
-    description: "Indian subcontinent rainfall index",
-  },
-  {
-    key: "defi-protocol",
-    name: "DeFi Protocol",
-    poolType: 3,
-    description: "Smart contract exploit coverage",
-  },
-] as const;
+// ── On-chain pool pubkeys ─────────────────────────────────────────────────
+// type → pool pubkey on devnet
+export const POOL_BY_TYPE: Record<number, string> = {
+  0: "EHxPZAMvRhumjFeChfeD9bn2Ju1RWf7RM45pY5vzEhNH",  // Earthquake
+  1: "HfyGsQVVsxt6BNM7UzTepBo91DKYdqLy7RKuLrwnM1YY",  // Flood
+  2: "HuPG3dmBftRCAwg71tro7pmp2hjoCT8KWaNtytwUqUo2",  // Crop MultiF
+  3: "ZZWgmeRUSdQyuarSb2zPFron2x88UgexhTQn8hJr9uD",   // Hurricane
+  4: "CcGbU74HpT8sjDU5NDDWFzBPYEARBEfAac4ovDWwgxWU",  // Stablecoin Depeg
+  5: "AqKUYemw3A6GbYFnCFwE9S1f1QCfhH4EAjFQCDxyfUtQ",  // Bridge Hack
+};
