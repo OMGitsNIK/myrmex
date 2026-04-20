@@ -4,7 +4,8 @@ import * as fs from "fs";
 import * as path from "path";
 
 const RPC_URL = process.env.RPC_URL || "https://api.devnet.solana.com";
-const PROGRAM_ID = process.env.PROGRAM_ID || "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan";
+const PROGRAM_ID =
+  process.env.PROGRAM_ID || "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan";
 
 let _program: anchor.Program | null = null;
 let _provider: anchor.AnchorProvider | null = null;

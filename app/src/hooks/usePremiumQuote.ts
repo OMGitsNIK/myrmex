@@ -34,7 +34,9 @@ function localFallbackQuote(params: QuoteRequest): Quote {
   const rate = base[params.coverage_type] ?? 0.03;
   const durationFactor = Math.min(params.duration_days / 30, 3);
   const premium_pct = rate * durationFactor;
-  const premium_usdc = parseFloat((params.payout_amount_usdc * premium_pct).toFixed(2));
+  const premium_usdc = parseFloat(
+    (params.payout_amount_usdc * premium_pct).toFixed(2)
+  );
   const risk_score = Math.round(premium_pct * 600);
   return {
     premium_usdc,
@@ -85,7 +87,7 @@ export function usePremiumQuote(params: QuoteRequest | null) {
       clearTimeout(timer);
       controller.abort();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(params)]);
 
   return { quote, loading, error };

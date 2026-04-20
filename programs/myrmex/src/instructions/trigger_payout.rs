@@ -111,13 +111,16 @@ pub fn handler(ctx: Context<TriggerPayout>, oracle_value: i64) -> Result<()> {
 
     // Update pool state
     let pool = &mut ctx.accounts.pool;
-    pool.total_locked = pool.total_locked
+    pool.total_locked = pool
+        .total_locked
         .checked_sub(payout_amount)
         .ok_or(error!(MyrmexError::MathOverflow))?;
-    pool.total_liquidity = pool.total_liquidity
+    pool.total_liquidity = pool
+        .total_liquidity
         .checked_sub(payout_amount)
         .ok_or(error!(MyrmexError::MathOverflow))?;
-    pool.active_policy_count = pool.active_policy_count
+    pool.active_policy_count = pool
+        .active_policy_count
         .checked_sub(1)
         .ok_or(error!(MyrmexError::MathOverflow))?;
 

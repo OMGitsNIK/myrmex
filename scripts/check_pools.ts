@@ -1,18 +1,31 @@
 import * as anchor from "@coral-xyz/anchor";
 import * as fs from "fs";
 
-const PROGRAM_ID = new anchor.web3.PublicKey("9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan");
+const PROGRAM_ID = new anchor.web3.PublicKey(
+  "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan"
+);
 
 async function main() {
   const admin = anchor.web3.Keypair.fromSecretKey(
-    Buffer.from(JSON.parse(fs.readFileSync(process.env.HOME + "/.config/solana/id.json", "utf-8")))
+    Buffer.from(
+      JSON.parse(
+        fs.readFileSync(process.env.HOME + "/.config/solana/id.json", "utf-8")
+      )
+    )
   );
-  const connection = new anchor.web3.Connection("https://api.devnet.solana.com", "confirmed");
+  const connection = new anchor.web3.Connection(
+    "https://api.devnet.solana.com",
+    "confirmed"
+  );
   const wallet = new anchor.Wallet(admin);
-  const provider = new anchor.AnchorProvider(connection, wallet, { commitment: "confirmed" });
+  const provider = new anchor.AnchorProvider(connection, wallet, {
+    commitment: "confirmed",
+  });
   anchor.setProvider(provider);
 
-  const idl = JSON.parse(fs.readFileSync(__dirname + "/../target/idl/myrmex.json", "utf-8"));
+  const idl = JSON.parse(
+    fs.readFileSync(__dirname + "/../target/idl/myrmex.json", "utf-8")
+  );
   const program = new anchor.Program(idl, provider);
 
   for (const type of [0, 1, 3]) {
@@ -29,8 +42,13 @@ async function main() {
       console.log(`  total_tvl:  ${Number(acc.totalTvl) / 1e6} USDC`);
       console.log(`  is_active:  ${acc.isActive}`);
     } catch (e: any) {
-      console.log(`Pool type ${type}: NOT INITIALIZED (${e.message?.slice(0, 80)})`);
+      console.log(
+        `Pool type ${type}: NOT INITIALIZED (${e.message?.slice(0, 80)})`
+      );
     }
   }
 }
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

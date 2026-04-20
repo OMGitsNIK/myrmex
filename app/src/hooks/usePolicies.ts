@@ -35,7 +35,10 @@ export function usePolicies() {
     setLoading(true);
     fetch(`${API_URL}/api/policies/${wallet.publicKey.toBase58()}`)
       .then((r) => r.json())
-      .then((data) => { setPolicies(data); setError(null); })
+      .then((data) => {
+        setPolicies(data);
+        setError(null);
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [wallet?.publicKey.toString()]);

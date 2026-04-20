@@ -53,7 +53,11 @@ describe("myrmex", () => {
 
     // Derive pool PDA
     [poolPda] = anchor.web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("pool"), lpAuthority.publicKey.toBuffer(), Buffer.from([POOL_TYPE])],
+      [
+        Buffer.from("pool"),
+        lpAuthority.publicKey.toBuffer(),
+        Buffer.from([POOL_TYPE]),
+      ],
       program.programId
     );
 
@@ -67,7 +71,12 @@ describe("myrmex", () => {
     poolVault = await getAssociatedTokenAddress(usdcMint, poolPda, true);
 
     // LP provider's LP token ATA
-    lpProviderTokens = await getAssociatedTokenAddress(lpMint, lpAuthority.publicKey, false, undefined);
+    lpProviderTokens = await getAssociatedTokenAddress(
+      lpMint,
+      lpAuthority.publicKey,
+      false,
+      undefined
+    );
 
     // Policyholder USDC ATA
     policyholderUsdcAta = await getAssociatedTokenAddress(
@@ -80,7 +89,8 @@ describe("myrmex", () => {
   it("1. Initialize risk pool", async () => {
     const poolName = new Uint8Array(32);
     const nameStr = "Flight-Global";
-    for (let i = 0; i < nameStr.length; i++) poolName[i] = nameStr.charCodeAt(i);
+    for (let i = 0; i < nameStr.length; i++)
+      poolName[i] = nameStr.charCodeAt(i);
 
     await program.methods
       .initializePool(POOL_TYPE, Array.from(poolName))
@@ -96,7 +106,11 @@ describe("myrmex", () => {
 
     const pool = await program.account.riskPool.fetch(poolPda);
     assert.isTrue(pool.isActive, "Pool should be active");
-    assert.equal(pool.totalLiquidity.toNumber(), 0, "Liquidity should start at 0");
+    assert.equal(
+      pool.totalLiquidity.toNumber(),
+      0,
+      "Liquidity should start at 0"
+    );
     assert.equal(pool.poolType, POOL_TYPE, "Pool type should match");
     console.log("  Pool initialized:", poolPda.toBase58());
   });
@@ -167,8 +181,8 @@ describe("myrmex", () => {
       100_000_000
     );
 
-    const payoutAmount = new BN(50_000_000);  // 50 USDC
-    const premiumAmount = new BN(5_000_000);  // 5 USDC
+    const payoutAmount = new BN(50_000_000); // 50 USDC
+    const premiumAmount = new BN(5_000_000); // 5 USDC
     const expiresAt = new BN(Math.floor(Date.now() / 1000) + 86400);
     policyNonce = new BN(Math.floor(Date.now() / 1000));
 
@@ -215,14 +229,20 @@ describe("myrmex", () => {
     assert.equal(policy.premiumAmount.toNumber(), 5_000_000);
 
     const pool = await program.account.riskPool.fetch(poolPda);
-    assert.equal(pool.totalLocked.toNumber(), 50_000_000, "Pool locked should increase");
+    assert.equal(
+      pool.totalLocked.toNumber(),
+      50_000_000,
+      "Pool locked should increase"
+    );
     assert.equal(pool.premiumAccrued.toNumber(), 5_000_000, "Premium accrued");
     console.log("  Policy created:", policyPda.toBase58());
   });
 
   // ── Test 4: Trigger payout ───────────────────────────────────────────────────
   it("4. Trigger payout when oracle condition met", async () => {
-    const balanceBefore = await connection.getTokenAccountBalance(policyholderUsdcAta);
+    const balanceBefore = await connection.getTokenAccountBalance(
+      policyholderUsdcAta
+    );
 
     await program.methods
       .triggerPayout(new BN(150)) // 150 min > threshold of 120
@@ -241,10 +261,16 @@ describe("myrmex", () => {
     assert.isTrue(policy.isClaimed, "Policy must be marked claimed");
     assert.isFalse(policy.isActive, "Policy must be inactive");
 
-    const balanceAfter = await connection.getTokenAccountBalance(policyholderUsdcAta);
+    const balanceAfter = await connection.getTokenAccountBalance(
+      policyholderUsdcAta
+    );
     const diff =
       Number(balanceAfter.value.amount) - Number(balanceBefore.value.amount);
-    assert.equal(diff, 50_000_000, "Policyholder should receive 50 USDC payout");
+    assert.equal(
+      diff,
+      50_000_000,
+      "Policyholder should receive 50 USDC payout"
+    );
 
     const pool = await program.account.riskPool.fetch(poolPda);
     assert.equal(pool.totalLocked.toNumber(), 0, "Pool locked should decrease");
@@ -273,8 +299,14 @@ describe("myrmex", () => {
       const blocked =
         err.message.includes("PolicyAlreadyClaimed") ||
         err.message.includes("PolicyNotActive");
-      assert.isTrue(blocked, "Should fail with PolicyAlreadyClaimed or PolicyNotActive");
-      console.log("  Double-payout correctly rejected:", err.message.split(":")[0]);
+      assert.isTrue(
+        blocked,
+        "Should fail with PolicyAlreadyClaimed or PolicyNotActive"
+      );
+      console.log(
+        "  Double-payout correctly rejected:",
+        err.message.split(":")[0]
+      );
     }
   });
 
@@ -303,8 +335,8 @@ describe("myrmex", () => {
     await program.methods
       .createPolicy(
         0,
-        new BN(10_000_000),  // 10 USDC payout
-        new BN(1_000_000),   // 1 USDC premium
+        new BN(10_000_000), // 10 USDC payout
+        new BN(1_000_000), // 1 USDC premium
         triggerCondition,
         expiredAt,
         expireNonce
@@ -360,7 +392,8 @@ describe("myrmex", () => {
     );
 
     const pool = await program.account.riskPool.fetch(poolPda);
-    const available = pool.totalLiquidity.toNumber() - pool.totalLocked.toNumber();
+    const available =
+      pool.totalLiquidity.toNumber() - pool.totalLocked.toNumber();
 
     if (available > 0) {
       const triggerCondition = {
@@ -399,7 +432,10 @@ describe("myrmex", () => {
           .accounts({
             provider: lpAuthority.publicKey,
             pool: poolPda,
-            providerUsdc: await getAssociatedTokenAddress(usdcMint, lpAuthority.publicKey),
+            providerUsdc: await getAssociatedTokenAddress(
+              usdcMint,
+              lpAuthority.publicKey
+            ),
             poolVault,
             lpTokenMint: lpMint,
             providerLpTokens: lpProviderTokens,
@@ -407,14 +443,18 @@ describe("myrmex", () => {
           .signers([lpAuthority])
           .rpc();
         // May succeed if not all is locked - that's OK
-        console.log("  Withdrawal succeeded (available liquidity not fully locked)");
+        console.log(
+          "  Withdrawal succeeded (available liquidity not fully locked)"
+        );
       } catch (err: any) {
         assert.include(
           err.message,
           "WithdrawalExceedsAvailable",
           "Should fail with WithdrawalExceedsAvailable when fully locked"
         );
-        console.log("  Withdrawal correctly blocked: locked collateral protected");
+        console.log(
+          "  Withdrawal correctly blocked: locked collateral protected"
+        );
       }
     }
   });
@@ -423,7 +463,8 @@ describe("myrmex", () => {
   it("8. LP can withdraw after liquidity freed", async () => {
     // Check available liquidity
     const pool = await program.account.riskPool.fetch(poolPda);
-    const available = pool.totalLiquidity.toNumber() - pool.totalLocked.toNumber();
+    const available =
+      pool.totalLiquidity.toNumber() - pool.totalLocked.toNumber();
 
     if (available <= 0) {
       console.log("  Skipping: no available liquidity to withdraw");
@@ -442,7 +483,10 @@ describe("myrmex", () => {
 
     // Withdraw proportional amount
     const withdrawAmount = new BN(lpBalance.toString());
-    const lpUsdcAta = await getAssociatedTokenAddress(usdcMint, lpAuthority.publicKey);
+    const lpUsdcAta = await getAssociatedTokenAddress(
+      usdcMint,
+      lpAuthority.publicKey
+    );
 
     const balanceBefore = await connection.getTokenAccountBalance(lpUsdcAta);
 

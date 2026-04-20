@@ -45,11 +45,7 @@ pub struct InitializePool<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler(
-    ctx: Context<InitializePool>,
-    pool_type: u8,
-    pool_name: [u8; 32],
-) -> Result<()> {
+pub fn handler(ctx: Context<InitializePool>, pool_type: u8, pool_name: [u8; 32]) -> Result<()> {
     require!(pool_type <= 6, MyrmexError::PoolNotActive);
 
     let pool = &mut ctx.accounts.pool;

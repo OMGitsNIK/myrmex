@@ -22,9 +22,12 @@ router.post("/", async (req, res) => {
     )) as any;
 
     const pool = policyAccount.pool as PublicKey;
-    const poolAccount = (await (program as any).account.riskPool.fetch(pool)) as any;
+    const poolAccount = (await (program as any).account.riskPool.fetch(
+      pool
+    )) as any;
     const policyholder = policyAccount.policyholder as PublicKey;
-    const oraclePubkey = policyAccount.triggerCondition.oraclePubkey as PublicKey;
+    const oraclePubkey = policyAccount.triggerCondition
+      .oraclePubkey as PublicKey;
     const usdcMint = poolAccount.usdcMint as PublicKey;
 
     const policyholderUsdc = getAssociatedTokenAddressSync(

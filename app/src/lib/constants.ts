@@ -17,10 +17,14 @@ export const RPC_URL =
 export function explorerUrl(tx: string): string {
   const rpc = RPC_URL;
   if (rpc.includes("localhost") || rpc.includes("127.0.0.1")) {
-    return `https://explorer.solana.com/tx/${tx}?cluster=custom&customUrl=${encodeURIComponent(rpc)}`;
+    return `https://explorer.solana.com/tx/${tx}?cluster=custom&customUrl=${encodeURIComponent(
+      rpc
+    )}`;
   }
-  if (rpc.includes("devnet")) return `https://explorer.solana.com/tx/${tx}?cluster=devnet`;
-  if (rpc.includes("testnet")) return `https://explorer.solana.com/tx/${tx}?cluster=testnet`;
+  if (rpc.includes("devnet"))
+    return `https://explorer.solana.com/tx/${tx}?cluster=devnet`;
+  if (rpc.includes("testnet"))
+    return `https://explorer.solana.com/tx/${tx}?cluster=testnet`;
   return `https://explorer.solana.com/tx/${tx}`;
 }
 
@@ -55,7 +59,8 @@ export const COVERAGE_TYPES = [
     id: 0,
     key: "flight_delay",
     name: "Flight Delay",
-    description: "Instant payout if your flight is delayed beyond your threshold",
+    description:
+      "Instant payout if your flight is delayed beyond your threshold",
     icon: "✈",
     maxPayout: 500,
     defaultThreshold: 120,
@@ -67,7 +72,8 @@ export const COVERAGE_TYPES = [
     id: 1,
     key: "crop_drought",
     name: "Crop Drought",
-    description: "Payout if rainfall drops below threshold during growing season",
+    description:
+      "Payout if rainfall drops below threshold during growing season",
     icon: "🌾",
     maxPayout: 10000,
     defaultThreshold: 20,
@@ -79,7 +85,8 @@ export const COVERAGE_TYPES = [
     id: 3,
     key: "defi_hack",
     name: "DeFi Protocol Hack",
-    description: "Coverage against smart contract exploits and oracle manipulation",
+    description:
+      "Coverage against smart contract exploits and oracle manipulation",
     icon: "🛡",
     maxPayout: 50000,
     defaultThreshold: 0,
