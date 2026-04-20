@@ -83,12 +83,19 @@ async function main() {
   // ─── 2. Create admin USDC ATA and mint seed capital ───────────────────────
   console.log("\n2. Minting seed USDC to admin...");
   const adminUsdcAta = await createAssociatedTokenAccount(
-    connection, admin, usdcMint, admin.publicKey
+    connection,
+    admin,
+    usdcMint,
+    admin.publicKey
   ).catch(() => getAssociatedTokenAddress(usdcMint, admin.publicKey));
 
   const totalSeedUsdc = POOLS.reduce((sum, p) => sum + p.seed, 0);
   await mintTo(
-    connection, admin, usdcMint, adminUsdcAta, admin,
+    connection,
+    admin,
+    usdcMint,
+    adminUsdcAta,
+    admin,
     BigInt(totalSeedUsdc) * BigInt(1_000_000)
   );
   console.log(`   ✓ Minted ${totalSeedUsdc} USDC to admin`);
@@ -99,7 +106,11 @@ async function main() {
 
   for (const pool of POOLS) {
     const [poolPda] = anchor.web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("pool"), admin.publicKey.toBuffer(), Buffer.from([pool.type])],
+      [
+        Buffer.from("pool"),
+        admin.publicKey.toBuffer(),
+        Buffer.from([pool.type]),
+      ],
       PROGRAM_ID
     );
     const [lpMint] = anchor.web3.PublicKey.findProgramAddressSync(
@@ -109,7 +120,10 @@ async function main() {
     const poolVault = await getAssociatedTokenAddress(usdcMint, poolPda, true);
 
     const nameBytes = new Uint8Array(32);
-    pool.name.trim().split("").forEach((c, i) => (nameBytes[i] = c.charCodeAt(0)));
+    pool.name
+      .trim()
+      .split("")
+      .forEach((c, i) => (nameBytes[i] = c.charCodeAt(0)));
 
     try {
       await (program as any).methods
@@ -122,7 +136,9 @@ async function main() {
           lpTokenMint: lpMint,
         })
         .rpc();
-      console.log(`   ✓ Pool ${pool.name.trim()} initialized: ${poolPda.toBase58()}`);
+      console.log(
+        `   ✓ Pool ${pool.name.trim()} initialized: ${poolPda.toBase58()}`
+      );
     } catch (e: any) {
       if (e.message?.includes("already in use")) {
         console.log(`   ℹ Pool ${pool.name.trim()} already exists`);
@@ -159,7 +175,9 @@ async function main() {
   results.forEach((r) => {
     console.log(`  ${r.name}: ${r.poolPda.toBase58()}`);
   });
-  console.log("\nAlso update this in Vercel env vars for the live site to show pools.");
+  console.log(
+    "\nAlso update this in Vercel env vars for the live site to show pools."
+  );
 }
 
 main().catch((e) => {

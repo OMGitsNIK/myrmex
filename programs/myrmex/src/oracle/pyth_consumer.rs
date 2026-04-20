@@ -1,5 +1,5 @@
-use anchor_lang::prelude::*;
 use crate::errors::MyrmexError;
+use anchor_lang::prelude::*;
 
 const MAX_ORACLE_AGE_SECS: i64 = 60;
 

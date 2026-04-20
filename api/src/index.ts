@@ -21,7 +21,9 @@ app.use("/api/simulate-trigger", simulateRouter);
 app.use("/api/quote", quoteRouter);
 app.use("/api/stats", statsRouter);
 
-app.get("/health", (_, res) => res.json({ status: "ok", service: "myrmex-api" }));
+app.get("/health", (_, res) =>
+  res.json({ status: "ok", service: "myrmex-api" })
+);
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

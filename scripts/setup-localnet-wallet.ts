@@ -60,10 +60,7 @@ async function main() {
   anchor.setProvider(provider);
 
   const idl = JSON.parse(
-    fs.readFileSync(
-      path.join(__dirname, "../target/idl/myrmex.json"),
-      "utf-8"
-    )
+    fs.readFileSync(path.join(__dirname, "../target/idl/myrmex.json"), "utf-8")
   );
   const program = new anchor.Program(idl, provider);
 
@@ -123,9 +120,7 @@ async function main() {
   // ─── 5. Initialize flight delay pool ─────────────────────────────────────
   console.log("\n4. Initializing Flight Delay risk pool...");
   const poolName = new Uint8Array(32);
-  "Flight-Global"
-    .split("")
-    .forEach((c, i) => (poolName[i] = c.charCodeAt(0)));
+  "Flight-Global".split("").forEach((c, i) => (poolName[i] = c.charCodeAt(0)));
 
   try {
     await (program as any).methods
@@ -177,9 +172,16 @@ async function main() {
   console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("✅ Setup complete!\n");
   console.log("Now do the following in Phantom:");
-  console.log("  1. Settings → Developer Settings → Testnets → Enable Custom RPC");
-  console.log("     OR: Settings → Change Network → Custom → http://localhost:8899");
-  console.log("  2. Import/switch to your wallet at:", phantomPubkey.toBase58());
+  console.log(
+    "  1. Settings → Developer Settings → Testnets → Enable Custom RPC"
+  );
+  console.log(
+    "     OR: Settings → Change Network → Custom → http://localhost:8899"
+  );
+  console.log(
+    "  2. Import/switch to your wallet at:",
+    phantomPubkey.toBase58()
+  );
   console.log("  3. Open http://localhost:3000\n");
   console.log("Copy these values into your app/.env.local for local testing:");
   console.log(`  NEXT_PUBLIC_USDC_MINT=${usdcMint.toBase58()}`);

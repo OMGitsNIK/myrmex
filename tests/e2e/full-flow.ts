@@ -75,11 +75,7 @@ async function runFullFlow() {
   // Derive pool PDA
   const POOL_TYPE = 0;
   const [poolPda] = anchor.web3.PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("pool"),
-      admin.publicKey.toBuffer(),
-      Buffer.from([POOL_TYPE]),
-    ],
+    [Buffer.from("pool"), admin.publicKey.toBuffer(), Buffer.from([POOL_TYPE])],
     PROGRAM_ID
   );
   const [lpMint] = anchor.web3.PublicKey.findProgramAddressSync(
@@ -179,9 +175,8 @@ async function runFullFlow() {
   // 4. Trigger payout
   console.log("\n4. Posting oracle trigger (150 minutes)...");
   console.log("\n5. Triggering payout...");
-  const balBefore = (
-    await connection.getTokenAccountBalance(phUsdcAta)
-  ).value.uiAmount;
+  const balBefore = (await connection.getTokenAccountBalance(phUsdcAta)).value
+    .uiAmount;
 
   await (program as any).methods
     .triggerPayout(new anchor.BN(150))
@@ -198,9 +193,8 @@ async function runFullFlow() {
 
   // 5. Verify payout
   console.log("\n6. Verifying payout received...");
-  const balAfter = (
-    await connection.getTokenAccountBalance(phUsdcAta)
-  ).value.uiAmount;
+  const balAfter = (await connection.getTokenAccountBalance(phUsdcAta)).value
+    .uiAmount;
   const received = (balAfter ?? 0) - (balBefore ?? 0);
   if (received !== 50) throw new Error(`Expected 50 USDC, got ${received}`);
   console.log("   ✓ Policyholder received:", received, "USDC");

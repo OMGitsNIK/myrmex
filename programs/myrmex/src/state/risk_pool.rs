@@ -1,5 +1,5 @@
-use anchor_lang::prelude::*;
 use crate::errors::MyrmexError;
+use anchor_lang::prelude::*;
 
 #[account]
 pub struct RiskPool {
