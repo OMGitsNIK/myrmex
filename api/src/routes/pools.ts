@@ -4,6 +4,16 @@ import { getAnchorProgram } from "../services/anchor.service";
 
 const router = Router();
 
+// v2 canonical names by pool type — overrides stale on-chain names
+const V2_POOL_NAMES: Record<number, string> = {
+  0: "Earthquake-Pacific",
+  1: "Flood-US-Rivers",
+  2: "Crop-MultiF",
+  3: "Hurricane-Gulf",
+  4: "USDC-Depeg",
+  5: "Bridge-Hack",
+};
+
 const PROGRAM_ID = new PublicKey(
   process.env.PROGRAM_ID || "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan"
 );
@@ -51,10 +61,8 @@ router.get("/", async (_req, res) => {
         return {
           pubkey: publicKey.toBase58(),
           poolType: acc.poolType,
-          poolName: Buffer.from(acc.poolName)
-            .toString("utf8")
-            .replace(/\0/g, "")
-            .trim(),
+          poolName: V2_POOL_NAMES[acc.poolType] ??
+            Buffer.from(acc.poolName).toString("utf8").replace(/\0/g, "").trim(),
           totalLiquidity,
           totalLocked,
           available,
