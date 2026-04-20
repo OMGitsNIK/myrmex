@@ -39,12 +39,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.startOracleCron = startOracleCron;
 /**
  * Oracle service — runs inside the API process on a 5-minute cron.
- * Fetches real-world data, verifies with Claude, posts OracleReport on-chain.
+ * Fetches real-world data, sanity-checks it, posts OracleReport on-chain.
  */
 const node_cron_1 = __importDefault(require("node-cron"));
 const anchor = __importStar(require("@coral-xyz/anchor"));
 const web3_js_1 = require("@solana/web3.js");
-const sdk_1 = __importDefault(require("@anthropic-ai/sdk"));
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const RPC_URL = process.env.RPC_URL || "https://api.devnet.solana.com";
@@ -118,34 +117,26 @@ async function fetchDefiTvl() {
     const resp = await fetch(`https://api.llama.fi/tvl/${DEFI_PROTOCOL}`);
     return parseFloat(await resp.text());
 }
-// ── AI verifier ───────────────────────────────────────────────────────────
-async function aiVerify(prompt) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey)
-        return { approved: true, reasoning: "AI verification skipped (no API key)" };
-    const client = new sdk_1.default({ apiKey });
-    const msg = await client.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 256,
-        messages: [{ role: "user", content: prompt }],
-    });
-    try {
-        const raw = msg.content[0].text;
-        const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-        return JSON.parse(cleaned);
-    }
-    catch {
-        return { approved: true, reasoning: "AI verification parse failed" };
-    }
+// ── Sanity checkers ───────────────────────────────────────────────────────
+function verifyCropRainfall(mm) {
+    if (mm < 0 || mm > 500)
+        return { approved: false, reasoning: `Out of range: ${mm}mm` };
+    return { approved: true, reasoning: `Plausible rainfall: ${mm.toFixed(2)}mm` };
+}
+function verifyDefiTvl(tvl) {
+    if (tvl < 1000000 || tvl > 200000000000)
+        return { approved: false, reasoning: `TVL out of range: $${(tvl / 1e9).toFixed(2)}B` };
+    return { approved: true, reasoning: `Plausible TVL: $${(tvl / 1e9).toFixed(2)}B` };
+}
+function verifyFlightDelay(minutes) {
+    if (minutes < 0 || minutes > 1440)
+        return { approved: false, reasoning: `Delay out of range: ${minutes}min` };
+    return { approved: true, reasoning: `Plausible delay: ${minutes}min` };
 }
 // ── Oracle jobs ───────────────────────────────────────────────────────────
 async function runCropJob() {
     const mm = await fetchRainfallMm();
-    const threshold = 2.0;
-    const { approved, reasoning } = await aiVerify(`You are a parametric crop insurance claim verifier.
-Rainfall today: ${mm.toFixed(2)} mm. Drought threshold: ${threshold} mm/day (trigger if below).
-Is ${mm.toFixed(2)} mm a plausible real-world reading and clearly within normal sensor range?
-Respond JSON only: {"approved": true/false, "reasoning": "one sentence"}`);
+    const { approved, reasoning } = verifyCropRainfall(mm);
     const onChainValue = Math.round(mm * 100); // e.g. 1.5mm → 150
     const description = `Rainfall ${mm.toFixed(2)}mm (x100=${onChainValue}). AI: ${reasoning}`;
     const tx = await postReport(new web3_js_1.PublicKey(CROP_POOL), onChainValue, description);
@@ -153,10 +144,7 @@ Respond JSON only: {"approved": true/false, "reasoning": "one sentence"}`);
 }
 async function runDefiJob() {
     const tvl = await fetchDefiTvl();
-    const { approved, reasoning } = await aiVerify(`You are a DeFi hack insurance claim verifier.
-${DEFI_PROTOCOL} TVL right now: $${(tvl / 1e9).toFixed(2)}B.
-Does this TVL level seem plausible and within a normal operational range (not a data error)?
-Respond JSON only: {"approved": true/false, "reasoning": "one sentence"}`);
+    const { approved, reasoning } = verifyDefiTvl(tvl);
     const onChainValue = Math.round(tvl / 1000000); // store in millions
     const description = `${DEFI_PROTOCOL} TVL $${(tvl / 1e9).toFixed(2)}B. AI: ${reasoning}`;
     const tx = await postReport(new web3_js_1.PublicKey(DEFI_POOL), onChainValue, description);
@@ -165,10 +153,7 @@ Respond JSON only: {"approved": true/false, "reasoning": "one sentence"}`);
 async function runFlightJob() {
     // Production: replace with AviationStack or FlightAware API call
     const delayMinutes = parseInt(process.env.MOCK_FLIGHT_DELAY_MINUTES || "0", 10);
-    const { approved, reasoning } = await aiVerify(`You are a flight delay insurance claim verifier.
-Reported delay: ${delayMinutes} minutes for a monitored flight.
-Is a ${delayMinutes}-minute delay a plausible real-world aviation event?
-Respond JSON only: {"approved": true/false, "reasoning": "one sentence"}`);
+    const { approved, reasoning } = verifyFlightDelay(delayMinutes);
     const description = `Flight delay ${delayMinutes} min. AI: ${reasoning}`;
     const tx = await postReport(new web3_js_1.PublicKey(FLIGHT_POOL), delayMinutes, description);
     console.log(`[oracle:flight] delay=${delayMinutes}min approved=${approved} tx=${tx.slice(0, 16)}…`);
