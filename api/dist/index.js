@@ -16,6 +16,7 @@ const stats_1 = require("./routes/stats");
 const oracle_1 = require("./routes/oracle");
 const indexer_service_1 = require("./services/indexer.service");
 const cron_service_1 = require("./services/cron.service");
+const oracle_service_1 = require("./services/oracle.service");
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
@@ -32,4 +33,5 @@ app.listen(PORT, () => {
     console.log(`MYRMEX API running on port ${PORT}`);
     (0, indexer_service_1.startIndexer)();
     (0, cron_service_1.startCron)();
+    (0, oracle_service_1.startOracleCron)();
 });

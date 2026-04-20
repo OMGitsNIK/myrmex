@@ -12,6 +12,7 @@ import { statsRouter } from "./routes/stats";
 import { oracleRouter } from "./routes/oracle";
 import { startIndexer } from "./services/indexer.service";
 import { startCron } from "./services/cron.service";
+import { startOracleCron } from "./services/oracle.service";
 
 const app = express();
 app.use(cors());
@@ -34,4 +35,5 @@ app.listen(PORT, () => {
   console.log(`MYRMEX API running on port ${PORT}`);
   startIndexer();
   startCron();
+  startOracleCron();
 });
