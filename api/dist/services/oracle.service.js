@@ -296,7 +296,8 @@ async function fetchStablecoinPrice() {
     };
 }
 // ── 6. Bridge/Exchange Hack — DeFiLlama bridges + hacks ──────────────────
-const BRIDGE_PROTOCOLS = ["wormhole", "stargate", "multichain", "across"];
+// multichain removed — hacked and shut down 2023, DeFiLlama data is stale
+const BRIDGE_PROTOCOLS = ["wormhole", "stargate", "across"];
 async function fetchBridgeTvl() {
     // Primary: DeFiLlama TVL for top bridges
     let totalTvl = 0;
@@ -313,20 +314,28 @@ async function fetchBridgeTvl() {
         catch { /* ignore */ }
     }
     const tvlMillions = Math.round(totalTvl / 1000000);
-    // Cross-check: DeFiLlama hacks feed (any bridge hack in last 7 days?)
-    let recentHacks = 0;
+    // Cross-check: Wormhole TVL via DeFiLlama per-chain (different endpoint, different aggregation)
+    let wormholeChainTvl = null;
+    let tvlDrop = "";
     try {
-        const r2 = await fetch("https://defillama.com/api/hacks", { signal: AbortSignal.timeout(8000) });
-        const hacks = (await r2.json());
-        const weekAgo = Date.now() / 1000 - 7 * 86400;
-        recentHacks = Array.isArray(hacks)
-            ? hacks.filter((h) => (h.date ?? 0) > weekAgo).length
-            : 0;
+        const r2 = await fetch("https://api.llama.fi/protocol/wormhole", { signal: AbortSignal.timeout(8000) });
+        const d2 = (await r2.json());
+        // Sum current chain TVLs as independent validation
+        const chainTvls = d2?.currentChainTvls ?? {};
+        wormholeChainTvl = Object.values(chainTvls).reduce((a, b) => a + (typeof b === "number" ? b : 0), 0);
+        // Flag a >30% drop between the two aggregation methods (potential exploit signal)
+        const wormholeSlug = tvls.find((t) => t.startsWith("wormhole="));
+        if (wormholeSlug && wormholeChainTvl > 0) {
+            const slugTvl = parseFloat(wormholeSlug.replace(/.*=\$/, "").replace("B", "")) * 1e9;
+            const dropPct = ((slugTvl - wormholeChainTvl) / Math.max(slugTvl, wormholeChainTvl)) * 100;
+            if (Math.abs(dropPct) > 30)
+                tvlDrop = ` ⚠ wormhole_tvl_discrepancy=${dropPct.toFixed(0)}%`;
+        }
     }
     catch { /* ignore */ }
     return {
         tvlMillions,
-        sources: `DeFiLlama bridges: ${tvls.join(" ")} total=$${(totalTvl / 1e9).toFixed(2)}B | recent_hacks_7d=${recentHacks}`,
+        sources: `DeFiLlama bridges: ${tvls.join(" ")} total=$${(totalTvl / 1e9).toFixed(2)}B${tvlDrop}`,
     };
 }
 // ── Oracle Jobs ───────────────────────────────────────────────────────────

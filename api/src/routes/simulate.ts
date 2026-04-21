@@ -56,9 +56,11 @@ function getOracleProgram() {
 }
 
 // POST /api/simulate-trigger
-// Demo: posts an oracle report and triggers a payout.
-// The server wallet must be configured as the oracle_authority for the pool.
+// Dev/demo only — disabled in production unless ALLOW_SIMULATE=true is explicitly set.
 router.post("/", async (req, res) => {
+  if (process.env.ALLOW_SIMULATE !== "true") {
+    return res.status(403).json({ error: "simulate-trigger is disabled in production" });
+  }
   try {
     const { policy: policyPubkeyStr, oracle_value } = req.body as {
       policy: string;
