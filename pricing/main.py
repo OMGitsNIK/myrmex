@@ -284,10 +284,15 @@ async def get_quote(req: QuoteRequest) -> QuoteResponse:
             result["breakdown"]["depeg_threshold_usd"] = threshold / 10000
 
         elif req.coverage_type in ("bridge_hack", "defi_hack"):
-            tvl_drop = req.tvl_drop_threshold_pct or 30
-            annual_prob, vol = _interpolate(BRIDGE_HACK_RISK, tvl_drop)
+            # Baseline: combined Wormhole + Stargate + Across TVL ~$1,730M
+            baseline_tvl_m = 1730
+            tvl_floor_m = req.tvl_drop_threshold_pct or 1500  # reused field: floor in $M
+            implied_drop_pct = max(5, min(90, (baseline_tvl_m - tvl_floor_m) / baseline_tvl_m * 100))
+            annual_prob, vol = _interpolate(BRIDGE_HACK_RISK, implied_drop_pct)
             result = _premium(annual_prob, vol, payout, days, util, min_rate=0.005)
-            result["breakdown"]["tvl_drop_threshold_pct"] = tvl_drop
+            result["breakdown"]["tvl_floor_millions"] = tvl_floor_m
+            result["breakdown"]["baseline_tvl_millions"] = baseline_tvl_m
+            result["breakdown"]["implied_drop_pct"] = round(implied_drop_pct, 1)
 
         elif req.coverage_type == "flight_delay":
             # Legacy — basic pricing

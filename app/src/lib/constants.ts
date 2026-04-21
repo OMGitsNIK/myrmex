@@ -211,7 +211,7 @@ export const COVERAGE_TYPES = [
       coverage_type: "bridge_hack",
       payout_amount_usdc: payout,
       duration_days: days,
-      tvl_drop_threshold_pct: 30,    // hardcoded at 30% drop for pricing
+      tvl_drop_threshold_pct: threshold,  // TVL floor in $M; pricing engine derives implied drop %
     }),
     extraFields: [],
   },

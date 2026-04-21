@@ -24,6 +24,46 @@ interface PolicySuccess {
   timestamp: Date;
 }
 
+// Threshold preset buttons per coverage type
+const THRESHOLD_PRESETS: Record<string, { label: string; value: number }[]> = {
+  earthquake: [
+    { label: "M5.5", value: 550 },
+    { label: "M6.5", value: 650 },
+    { label: "M7.0", value: 700 },
+    { label: "M7.5", value: 750 },
+  ],
+  flood: [
+    { label: "20 ft", value: 200 },
+    { label: "30 ft", value: 300 },
+    { label: "40 ft", value: 400 },
+    { label: "50 ft", value: 500 },
+  ],
+  crop_multifactor: [
+    { label: "Mild (4000)", value: 4000 },
+    { label: "Moderate (3000)", value: 3000 },
+    { label: "Severe (2000)", value: 2000 },
+    { label: "Extreme (1000)", value: 1000 },
+  ],
+  hurricane: [
+    { label: "Cat 1 (64kt)", value: 64 },
+    { label: "Cat 2 (83kt)", value: 83 },
+    { label: "Cat 3 (96kt)", value: 96 },
+    { label: "Cat 5 (137kt)", value: 137 },
+  ],
+  stablecoin_depeg: [
+    { label: "$0.99", value: 9900 },
+    { label: "$0.98", value: 9800 },
+    { label: "$0.97", value: 9700 },
+    { label: "$0.95", value: 9500 },
+  ],
+  bridge_hack: [
+    { label: "$2B TVL floor", value: 2000 },
+    { label: "$1.5B TVL floor", value: 1500 },
+    { label: "$1B TVL floor", value: 1000 },
+    { label: "$500M TVL floor", value: 500 },
+  ],
+};
+
 export default function BuyPage() {
   const { program, wallet } = useAnchorProgram();
 
@@ -31,11 +71,11 @@ export default function BuyPage() {
   const [payoutAmount, setPayoutAmount] = useState(1000);
   const [durationDays, setDurationDays] = useState(30);
   const [threshold, setThreshold] = useState<number>(COVERAGE_TYPES[0].defaultThreshold);
-  // Dynamic extra fields (e.g. region, river, seismic_region)
   const [extraValues, setExtraValues] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [policies, setPolicies] = useState<PolicySuccess[]>([]);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [showBreakdown, setShowBreakdown] = useState(false);
 
   const extraField = (key: string) =>
     extraValues[key] ?? (selectedType.extraFields as readonly any[]).find((f: any) => f.key === key)?.default ?? "";
@@ -95,7 +135,6 @@ export default function BuyPage() {
       const policyholderUsdc = getAssociatedTokenAddressSync(USDC_MINT, wallet.publicKey);
       const connection = program.provider.connection;
 
-      // Ensure policyholder USDC ATA exists
       const setupTx = new Transaction();
       setupTx.add(createAssociatedTokenAccountIdempotentInstruction(
         wallet.publicKey, policyholderUsdc, wallet.publicKey, USDC_MINT
@@ -151,19 +190,20 @@ export default function BuyPage() {
       ]);
       toast.success("Policy created!");
     } catch (e: unknown) {
-      const err = e as Error;
-      toast.error("Transaction failed", { description: err.message });
+      toast.error("Transaction failed", { description: (e as Error).message });
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const presets = THRESHOLD_PRESETS[selectedType.key] ?? [];
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
       <div>
         <h1 className="text-3xl font-bold text-white tracking-tight">Buy Coverage</h1>
         <p className="text-gray-400 mt-2">
-          Parametric insurance — no adjusters, no claims process. USDC sent automatically when the oracle confirms your trigger.
+          Parametric insurance — no adjusters, no claims. USDC sent automatically when the oracle confirms your trigger.
         </p>
       </div>
 
@@ -210,10 +250,16 @@ export default function BuyPage() {
                     {copiedKey === pol.policyKey ? "✓" : "⧉"}
                   </button>
                 </div>
-                <a href={explorerUrl(pol.txSig)} target="_blank" rel="noopener noreferrer"
-                  className="text-xs border border-[var(--accent)]/40 text-[var(--accent)] px-3 py-1.5 rounded hover:border-[var(--accent)] transition-colors">
-                  Explorer →
-                </a>
+                <div className="flex gap-2">
+                  <a href={`/simulate?policy=${pol.policyKey}`}
+                    className="text-xs border border-gray-700 text-gray-400 px-3 py-1.5 rounded hover:border-gray-500 transition-colors">
+                    Simulate →
+                  </a>
+                  <a href={explorerUrl(pol.txSig)} target="_blank" rel="noopener noreferrer"
+                    className="text-xs border border-[var(--accent)]/40 text-[var(--accent)] px-3 py-1.5 rounded hover:border-[var(--accent)] transition-colors">
+                    Explorer →
+                  </a>
+                </div>
               </div>
             </div>
           ))}
@@ -263,7 +309,7 @@ export default function BuyPage() {
             />
           </label>
           <label className="space-y-1">
-            <span className="text-xs text-gray-500">Duration (days)</span>
+            <span className="text-xs text-gray-500">Duration (days, max 365)</span>
             <input
               type="number"
               value={durationDays}
@@ -275,23 +321,42 @@ export default function BuyPage() {
           </label>
         </div>
 
-        {/* Threshold */}
-        <label className="space-y-1 block">
-          <span className="text-xs text-gray-500">{selectedType.thresholdLabel}</span>
-          <div className="flex items-center gap-3">
-            <input
-              type="number"
-              value={threshold}
-              onChange={(e) => setThreshold(Number(e.target.value))}
-              className="flex-1 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white focus:border-[var(--accent)]/50 outline-none transition-colors"
-            />
-            <span className="text-sm text-[var(--accent)] font-mono whitespace-nowrap">
-              {selectedType.thresholdDisplay(threshold)}
-            </span>
-          </div>
-        </label>
+        {/* Threshold with preset buttons */}
+        <div className="space-y-2">
+          <label className="space-y-1 block">
+            <span className="text-xs text-gray-500">{selectedType.thresholdLabel}</span>
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                value={threshold}
+                onChange={(e) => setThreshold(Number(e.target.value))}
+                className="flex-1 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white focus:border-[var(--accent)]/50 outline-none transition-colors"
+              />
+              <span className="text-sm text-[var(--accent)] font-mono whitespace-nowrap">
+                {selectedType.thresholdDisplay(threshold)}
+              </span>
+            </div>
+          </label>
+          {presets.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {presets.map((p) => (
+                <button
+                  key={p.value}
+                  onClick={() => setThreshold(p.value)}
+                  className={`text-xs px-2.5 py-1 rounded border transition-colors ${
+                    threshold === p.value
+                      ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent-dim)]"
+                      : "border-[var(--border)] text-gray-400 hover:border-gray-500"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
-        {/* Dynamic extra fields (region, river, etc.) */}
+        {/* Dynamic extra fields */}
         {(selectedType.extraFields as readonly any[]).length > 0 && (
           <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${(selectedType.extraFields as readonly any[]).length}, 1fr)` }}>
             {(selectedType.extraFields as readonly any[]).map((field: any) => (
@@ -311,7 +376,18 @@ export default function BuyPage() {
 
       {/* Premium quote */}
       <div className="card p-6 space-y-4">
-        <h2 className="font-semibold text-white text-sm uppercase tracking-widest">AI Premium Quote</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-white text-sm uppercase tracking-widest">Actuarial Premium Quote</h2>
+          {quote && !quoteLoading && (
+            <button
+              onClick={() => setShowBreakdown((v) => !v)}
+              className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+            >
+              {showBreakdown ? "Hide breakdown ↑" : "Show math ↓"}
+            </button>
+          )}
+        </div>
+
         {quoteLoading && <div className="text-gray-400 text-sm animate-pulse">Calculating…</div>}
         {quote && !quoteLoading && (
           <div className="space-y-3">
@@ -331,6 +407,30 @@ export default function BuyPage() {
               <span className="text-gray-400 text-sm">Model Confidence</span>
               <span className="text-white capitalize">{quote.confidence}</span>
             </div>
+
+            {/* Actuarial breakdown */}
+            {showBreakdown && quote.breakdown && (quote.breakdown as any).source !== "local_fallback" && (
+              <div className="mt-2 pt-3 border-t border-[var(--border)] space-y-2">
+                <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">Actuarial Model</div>
+                {[
+                  ["Annual probability", `${((quote.breakdown as any).annual_probability * 100).toFixed(3)}%`],
+                  ["Period probability", `${((quote.breakdown as any).period_probability * 100).toFixed(3)}%`],
+                  ["Expected loss", `$${(quote.breakdown as any).expected_loss_usdc?.toFixed(2)}`],
+                  ["Volatility loading", `×${(quote.breakdown as any).vol_loading?.toFixed(3)}`],
+                  ["Utilization loading", `×${(quote.breakdown as any).util_loading?.toFixed(3)}`],
+                ].map(([label, value]) => (
+                  <div key={label as string} className="flex justify-between text-xs">
+                    <span className="text-gray-500">{label}</span>
+                    <span className="text-gray-300 font-mono">{value}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between text-xs pt-1 border-t border-[var(--border)]">
+                  <span className="text-gray-400">Formula</span>
+                  <span className="text-gray-400 font-mono text-right text-[10px]">E[loss] × vol_load × util_load</span>
+                </div>
+              </div>
+            )}
+
             {(quote as any).breakdown?.source === "local_fallback" && (
               <p className="text-xs text-yellow-500/70 pt-1">
                 Estimate only — pricing API offline. Quote uses actuarial fallback rates.
