@@ -34,6 +34,10 @@ pub enum MyrmexError {
     CoverageCapExceeded,
     #[msg("Oracle report is stale — must be posted within the validity window")]
     OracleReportStale,
+    #[msg("Oracle report was posted before this policy was created")]
+    OracleReportBeforePolicy,
+    #[msg("Oracle report scope does not match this policy")]
+    OracleScopeMismatch,
     #[msg("Invalid configuration parameter")]
     InvalidConfig,
 }

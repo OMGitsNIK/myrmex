@@ -3,7 +3,14 @@
 import { useState } from "react";
 import { useAnchorProgram } from "@/hooks/useAnchorProgram";
 import { usePremiumQuote } from "@/hooks/usePremiumQuote";
-import { COVERAGE_TYPES, USDC_MINT, API_URL, explorerUrl } from "@/lib/constants";
+import {
+  API_URL,
+  COVERAGE_TYPES,
+  explorerUrl,
+  policyScopeSeed,
+  scopeHashBytes,
+  USDC_MINT,
+} from "@/lib/constants";
 import * as anchor from "@coral-xyz/anchor";
 import {
   getAssociatedTokenAddressSync,
@@ -125,6 +132,9 @@ export default function BuyPage() {
       const poolConfigPda = new PublicKey(matchingPool.poolConfig.pubkey);
       const oracleAuthority = new PublicKey(matchingPool.poolConfig.oracleAuthority);
       const poolVault = new PublicKey(matchingPool.vault);
+      const scopeHash = await scopeHashBytes(
+        policyScopeSeed(selectedType.id, selectedType.key, extraValues)
+      );
 
       const nonce = new anchor.BN(Date.now());
       const [policyPda] = PublicKey.findProgramAddressSync(
@@ -150,6 +160,7 @@ export default function BuyPage() {
 
       const triggerCondition = {
         oraclePubkey: oracleAuthority,
+        scopeHash,
         threshold: new anchor.BN(threshold),
         comparison: selectedType.comparison,
       };

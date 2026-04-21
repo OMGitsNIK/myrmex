@@ -43,7 +43,7 @@ async function runFullFlow() {
   const oracle = anchor.web3.Keypair.generate();
 
   // Airdrop
-  for (const kp of [lp, policyholder]) {
+  for (const kp of [lp, policyholder, oracle]) {
     await connection.requestAirdrop(kp.publicKey, 2e9);
   }
   await new Promise((r) => setTimeout(r, 1000));
@@ -83,6 +83,15 @@ async function runFullFlow() {
     PROGRAM_ID
   );
   const poolVault = await getAssociatedTokenAddress(usdcMint, poolPda, true);
+  const SCOPE_HASH = Array(32).fill(7);
+  const [poolConfigPda] = anchor.web3.PublicKey.findProgramAddressSync(
+    [Buffer.from("pool_config"), poolPda.toBuffer()],
+    PROGRAM_ID
+  );
+  const [oracleReportPda] = anchor.web3.PublicKey.findProgramAddressSync(
+    [Buffer.from("oracle_report"), poolPda.toBuffer(), Buffer.from(SCOPE_HASH)],
+    PROGRAM_ID
+  );
 
   // 1. Initialize pool
   console.log("\n1. Creating pool...");
@@ -99,6 +108,16 @@ async function runFullFlow() {
     })
     .rpc();
   console.log("   Pool:", poolPda.toBase58());
+
+  await (program as any).methods
+    .initializePoolConfig(oracle.publicKey, new anchor.BN(500), new anchor.BN(8000))
+    .accounts({
+      authority: admin.publicKey,
+      pool: poolPda,
+      poolConfig: poolConfigPda,
+      systemProgram: anchor.web3.SystemProgram.programId,
+    })
+    .rpc();
 
   // 2. Fund pool
   console.log("\n2. Funding pool with 500 USDC...");
@@ -154,6 +173,7 @@ async function runFullFlow() {
       new anchor.BN(5_000_000),
       {
         oraclePubkey: oracle.publicKey,
+        scopeHash: SCOPE_HASH,
         threshold: new anchor.BN(120),
         comparison: 0,
       },
@@ -164,6 +184,7 @@ async function runFullFlow() {
       policyholder: policyholder.publicKey,
       policy: policyPda,
       pool: poolPda,
+      poolConfig: poolConfigPda,
       policyholderUsdc: phUsdcAta,
       poolVault,
       usdcMint,
@@ -174,18 +195,31 @@ async function runFullFlow() {
 
   // 4. Trigger payout
   console.log("\n4. Posting oracle trigger (150 minutes)...");
+  await (program as any).methods
+    .postOracleReport(new anchor.BN(150), SCOPE_HASH, Array(192).fill(0))
+    .accounts({
+      oracleAuthority: oracle.publicKey,
+      pool: poolPda,
+      poolConfig: poolConfigPda,
+      oracleReport: oracleReportPda,
+      systemProgram: anchor.web3.SystemProgram.programId,
+    })
+    .signers([oracle])
+    .rpc();
+
   console.log("\n5. Triggering payout...");
   const balBefore = (await connection.getTokenAccountBalance(phUsdcAta)).value
     .uiAmount;
 
   await (program as any).methods
-    .triggerPayout(new anchor.BN(150))
+    .triggerPayout()
     .accounts({
       caller: admin.publicKey,
       policy: policyPda,
       pool: poolPda,
+      poolConfig: poolConfigPda,
+      oracleReport: oracleReportPda,
       policyholderUsdc: phUsdcAta,
-      oracleAccount: oracle.publicKey,
       poolVault,
       policyholder: policyholder.publicKey,
     })
@@ -203,13 +237,14 @@ async function runFullFlow() {
   console.log("\n7. Attempting double-payout (should fail)...");
   try {
     await (program as any).methods
-      .triggerPayout(new anchor.BN(150))
+      .triggerPayout()
       .accounts({
         caller: admin.publicKey,
         policy: policyPda,
         pool: poolPda,
+        poolConfig: poolConfigPda,
+        oracleReport: oracleReportPda,
         policyholderUsdc: phUsdcAta,
-        oracleAccount: oracle.publicKey,
         poolVault,
         policyholder: policyholder.publicKey,
       })

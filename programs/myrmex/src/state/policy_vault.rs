@@ -14,6 +14,9 @@ pub enum CoverageType {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct TriggerCondition {
     pub oracle_pubkey: Pubkey,
+    /// Domain-specific risk scope, such as region/gauge/asset/route hash.
+    /// Payouts require an oracle report posted for the same scope.
+    pub scope_hash: [u8; 32],
     pub threshold: i64,
     pub comparison: u8,
 }
@@ -34,6 +37,6 @@ pub struct PolicyVault {
 }
 
 impl PolicyVault {
-    // 8 discriminator + 32 + 32 + 1 + 8 + 8 + (32+8+1) + 8 + 8 + 1 + 1 + 1 = 149
-    pub const LEN: usize = 149;
+    // 8 discriminator + 32 + 32 + 1 + 8 + 8 + (32+32+8+1) + 8 + 8 + 1 + 1 + 1 = 181
+    pub const LEN: usize = 181;
 }

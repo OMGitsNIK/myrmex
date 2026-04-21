@@ -21,6 +21,7 @@ router.get("/:pubkey", async (req, res) => {
         premiumAmount: acc.premiumAmount.toNumber(),
         triggerCondition: {
           oraclePubkey: acc.triggerCondition.oraclePubkey.toBase58(),
+          scopeHash: Array.from(acc.triggerCondition.scopeHash),
           threshold: acc.triggerCondition.threshold.toNumber(),
           comparison: acc.triggerCondition.comparison,
         },

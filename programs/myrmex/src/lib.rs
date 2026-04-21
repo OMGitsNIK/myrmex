@@ -36,9 +36,10 @@ pub mod myrmex {
     pub fn post_oracle_report(
         ctx: Context<PostOracleReport>,
         reported_value: i64,
+        scope_hash: [u8; 32],
         description: [u8; 192],
     ) -> Result<()> {
-        instructions::post_oracle_report::handler(ctx, reported_value, description)
+        instructions::post_oracle_report::handler(ctx, reported_value, scope_hash, description)
     }
 
     pub fn fund_pool(ctx: Context<FundPool>, amount: u64) -> Result<()> {

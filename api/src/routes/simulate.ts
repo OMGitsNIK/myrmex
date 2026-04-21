@@ -91,8 +91,9 @@ router.post("/", async (req, res) => {
       [Buffer.from("pool_config"), poolPk.toBuffer()],
       PROGRAM_ID
     );
+    const scopeHash = Buffer.from(policyAccount.triggerCondition.scopeHash);
     const [oracleReportPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("oracle_report"), poolPk.toBuffer()],
+      [Buffer.from("oracle_report"), poolPk.toBuffer(), scopeHash],
       PROGRAM_ID
     );
 
@@ -103,7 +104,7 @@ router.post("/", async (req, res) => {
     // Step 1: post oracle report — signed by oracle keypair
     const { program: oracleProgram, provider: oracleProvider } = getOracleProgram();
     await oracleProgram.methods
-      .postOracleReport(new anchor.BN(oracle_value), description)
+      .postOracleReport(new anchor.BN(oracle_value), Array.from(scopeHash), description)
       .accounts({
         oracleAuthority: oracleProvider.wallet.publicKey,
         pool: poolPk,

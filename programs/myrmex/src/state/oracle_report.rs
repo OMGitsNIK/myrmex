@@ -6,6 +6,9 @@ pub struct OracleReport {
     pub authority: Pubkey,
     /// Which pool this report is for
     pub pool: Pubkey,
+    /// Domain-specific risk scope. Multiple regions/assets/gauges can share a pool
+    /// without sharing the same latest oracle report.
+    pub scope_hash: [u8; 32],
     /// The verified oracle value (e.g. rainfall mm, delay minutes, TVL in USD)
     pub reported_value: i64,
     /// Unix timestamp when this report was posted
@@ -16,8 +19,8 @@ pub struct OracleReport {
 }
 
 impl OracleReport {
-    // 8 discriminator + 32 + 32 + 8 + 8 + 192 + 1
-    pub const LEN: usize = 281;
+    // 8 discriminator + 32 + 32 + 32 + 8 + 8 + 192 + 1
+    pub const LEN: usize = 313;
 
     /// Reports are valid for 24 hours — enough time for policyholders to claim
     pub const MAX_AGE_SECS: i64 = 86_400;

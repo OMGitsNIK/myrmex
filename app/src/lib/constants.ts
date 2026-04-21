@@ -47,6 +47,42 @@ export const COMPARISON_LABELS: Record<number, string> = {
   2: "==",
 };
 
+export const DEFAULT_SCOPE_SEEDS: Record<number, string> = {
+  0: "earthquake:Global",
+  1: "flood:Mississippi",
+  2: "crop_multifactor:Iowa",
+  3: "hurricane:global",
+  4: "stablecoin_depeg:usdc-usdt",
+  5: "bridge_hack:wormhole-stargate-across",
+};
+
+export function bytesToHex(bytes: number[]): string {
+  return bytes.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export function hexToBytes(hex: string): number[] {
+  const clean = hex.startsWith("0x") ? hex.slice(2) : hex;
+  if (clean.length !== 64) return new Array(32).fill(0);
+  return Array.from({ length: 32 }, (_, i) => parseInt(clean.slice(i * 2, i * 2 + 2), 16));
+}
+
+export async function scopeHashBytes(seed: string): Promise<number[]> {
+  const data = new TextEncoder().encode(seed);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest));
+}
+
+export function policyScopeSeed(
+  coverageTypeId: number,
+  coverageKey: string,
+  values: Record<string, string>
+): string {
+  if (coverageKey === "earthquake") return `earthquake:${values.seismic_region || "Global"}`;
+  if (coverageKey === "flood") return `flood:${values.river || "Mississippi"}`;
+  if (coverageKey === "crop_multifactor") return `crop_multifactor:${values.crop_region || "Iowa"}`;
+  return DEFAULT_SCOPE_SEEDS[coverageTypeId] || `${coverageKey}:default`;
+}
+
 // ── Coverage type definitions (for buy page) ─────────────────────────────
 
 export const COVERAGE_TYPES = [

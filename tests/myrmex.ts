@@ -27,18 +27,22 @@ describe("myrmex", () => {
   let poolPda: anchor.web3.PublicKey;
   let poolVault: anchor.web3.PublicKey;
   let lpMint: anchor.web3.PublicKey;
+  let poolConfigPda: anchor.web3.PublicKey;
+  let oracleReportPda: anchor.web3.PublicKey;
   let lpProviderTokens: anchor.web3.PublicKey;
   let policyholderUsdcAta: anchor.web3.PublicKey;
   let policyPda: anchor.web3.PublicKey;
   let policyNonce: anchor.BN;
 
   const POOL_TYPE = 0; // Flight
+  const SCOPE_HASH = Array(32).fill(7);
 
   before(async () => {
     // Airdrop SOL to test wallets
     await Promise.all([
       connection.requestAirdrop(lpAuthority.publicKey, 3e9),
       connection.requestAirdrop(policyholderKp.publicKey, 3e9),
+      connection.requestAirdrop(oracleKp.publicKey, 3e9),
     ]);
     await new Promise((r) => setTimeout(r, 2000));
 
@@ -64,6 +68,14 @@ describe("myrmex", () => {
     // LP token mint PDA
     [lpMint] = anchor.web3.PublicKey.findProgramAddressSync(
       [Buffer.from("lp_mint"), poolPda.toBuffer()],
+      program.programId
+    );
+    [poolConfigPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("pool_config"), poolPda.toBuffer()],
+      program.programId
+    );
+    [oracleReportPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("oracle_report"), poolPda.toBuffer(), Buffer.from(SCOPE_HASH)],
       program.programId
     );
 
@@ -113,6 +125,16 @@ describe("myrmex", () => {
     );
     assert.equal(pool.poolType, POOL_TYPE, "Pool type should match");
     console.log("  Pool initialized:", poolPda.toBase58());
+
+    await program.methods
+      .initializePoolConfig(oracleKp.publicKey, new BN(500), new BN(8000))
+      .accounts({
+        authority: lpAuthority.publicKey,
+        pool: poolPda,
+        poolConfig: poolConfigPda,
+      })
+      .signers([lpAuthority])
+      .rpc();
   });
 
   // ── Test 2: Fund pool ────────────────────────────────────────────────────────
@@ -188,6 +210,7 @@ describe("myrmex", () => {
 
     const triggerCondition = {
       oraclePubkey: oracleKp.publicKey,
+      scopeHash: SCOPE_HASH,
       threshold: new BN(120),
       comparison: 0, // greater than
     };
@@ -215,6 +238,7 @@ describe("myrmex", () => {
         policyholder: policyholderKp.publicKey,
         policy: policyPda,
         pool: poolPda,
+        poolConfig: poolConfigPda,
         policyholderUsdc: policyholderUsdcAta,
         poolVault,
         usdcMint,
@@ -245,13 +269,25 @@ describe("myrmex", () => {
     );
 
     await program.methods
-      .triggerPayout(new BN(150)) // 150 min > threshold of 120
+      .postOracleReport(new BN(150), SCOPE_HASH, Array(192).fill(0))
+      .accounts({
+        oracleAuthority: oracleKp.publicKey,
+        pool: poolPda,
+        poolConfig: poolConfigPda,
+        oracleReport: oracleReportPda,
+      })
+      .signers([oracleKp])
+      .rpc();
+
+    await program.methods
+      .triggerPayout()
       .accounts({
         caller: provider.wallet.publicKey,
         policy: policyPda,
         pool: poolPda,
+        poolConfig: poolConfigPda,
+        oracleReport: oracleReportPda,
         policyholderUsdc: policyholderUsdcAta,
-        oracleAccount: oracleKp.publicKey,
         poolVault,
         policyholder: policyholderKp.publicKey,
       })
@@ -281,13 +317,14 @@ describe("myrmex", () => {
   it("5. Double-payout attempt is rejected", async () => {
     try {
       await program.methods
-        .triggerPayout(new BN(150))
+        .triggerPayout()
         .accounts({
           caller: provider.wallet.publicKey,
           policy: policyPda,
           pool: poolPda,
+          poolConfig: poolConfigPda,
+          oracleReport: oracleReportPda,
           policyholderUsdc: policyholderUsdcAta,
-          oracleAccount: oracleKp.publicKey,
           poolVault,
           policyholder: policyholderKp.publicKey,
         })
@@ -328,6 +365,7 @@ describe("myrmex", () => {
     const expiredAt = new BN(Math.floor(Date.now() / 1000) + 1);
     const triggerCondition = {
       oraclePubkey: oracleKp.publicKey,
+      scopeHash: SCOPE_HASH,
       threshold: new BN(120),
       comparison: 0,
     };
@@ -345,6 +383,7 @@ describe("myrmex", () => {
         policyholder: policyholderKp.publicKey,
         policy: expirePolicyPda,
         pool: poolPda,
+        poolConfig: poolConfigPda,
         policyholderUsdc: policyholderUsdcAta,
         poolVault,
         usdcMint,
@@ -398,6 +437,7 @@ describe("myrmex", () => {
     if (available > 0) {
       const triggerCondition = {
         oraclePubkey: oracleKp.publicKey,
+        scopeHash: SCOPE_HASH,
         threshold: new BN(120),
         comparison: 0,
       };
@@ -414,6 +454,7 @@ describe("myrmex", () => {
           policyholder: policyholderKp.publicKey,
           policy: lockPolicyPda,
           pool: poolPda,
+          poolConfig: poolConfigPda,
           policyholderUsdc: policyholderUsdcAta,
           poolVault,
           usdcMint,

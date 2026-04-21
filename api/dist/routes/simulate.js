@@ -94,12 +94,13 @@ router.post("/", async (req, res) => {
         const usdcMint = poolAccount.usdcMint;
         const policyholderUsdc = (0, spl_token_1.getAssociatedTokenAddressSync)(usdcMint, policyholder, false);
         const [poolConfigPda] = web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("pool_config"), poolPk.toBuffer()], PROGRAM_ID);
-        const [oracleReportPda] = web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("oracle_report"), poolPk.toBuffer()], PROGRAM_ID);
+        const scopeHash = Buffer.from(policyAccount.triggerCondition.scopeHash);
+        const [oracleReportPda] = web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("oracle_report"), poolPk.toBuffer(), scopeHash], PROGRAM_ID);
         const description = toDescriptionBytes(`Simulated event: value=${oracle_value}`);
         // Step 1: post oracle report — signed by oracle keypair
         const { program: oracleProgram, provider: oracleProvider } = getOracleProgram();
         await oracleProgram.methods
-            .postOracleReport(new anchor.BN(oracle_value), description)
+            .postOracleReport(new anchor.BN(oracle_value), Array.from(scopeHash), description)
             .accounts({
             oracleAuthority: oracleProvider.wallet.publicKey,
             pool: poolPk,

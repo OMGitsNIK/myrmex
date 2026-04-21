@@ -57,6 +57,7 @@ const web3_js_1 = require("@solana/web3.js");
 const groq_sdk_1 = __importDefault(require("groq-sdk"));
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
+const crypto_1 = require("crypto");
 // ── Pool addresses ────────────────────────────────────────────────────────
 const EARTHQUAKE_POOL = process.env.EARTHQUAKE_POOL || "EHxPZAMvRhumjFeChfeD9bn2Ju1RWf7RM45pY5vzEhNH";
 const FLOOD_POOL = process.env.FLOOD_POOL || "HfyGsQVVsxt6BNM7UzTepBo91DKYdqLy7RKuLrwnM1YY";
@@ -70,6 +71,14 @@ const CROP_LON = process.env.CROP_LON || "-93.0977";
 const USGS_FLOOD_SITE = process.env.USGS_FLOOD_SITE || "07010000"; // Mississippi @ St. Louis
 const RPC_URL = process.env.RPC_URL || "https://api.devnet.solana.com";
 const PROGRAM_ID = new web3_js_1.PublicKey(process.env.PROGRAM_ID || "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan");
+const SCOPE_SEEDS = {
+    earthquake: "earthquake:Global",
+    flood: "flood:Mississippi",
+    crop: "crop_multifactor:Iowa",
+    hurricane: "hurricane:global",
+    stablecoin: "stablecoin_depeg:usdc-usdt",
+    bridge: "bridge_hack:wormhole-stargate-across",
+};
 // ── Keypair / Program ─────────────────────────────────────────────────────
 function loadOracleKeypair() {
     if (process.env.ORACLE_KEYPAIR_JSON) {
@@ -96,12 +105,15 @@ function toDescBytes(s) {
     buf.write(s.slice(0, 191), "utf8");
     return Array.from(buf);
 }
-async function postReport(poolPk, value, description) {
+function scopeHash(seed) {
+    return Array.from((0, crypto_1.createHash)("sha256").update(seed).digest());
+}
+async function postReport(poolPk, value, scope, description) {
     const { program, provider } = getOracleProgram();
     const [poolConfigPda] = web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("pool_config"), poolPk.toBuffer()], PROGRAM_ID);
-    const [oracleReportPda] = web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("oracle_report"), poolPk.toBuffer()], PROGRAM_ID);
+    const [oracleReportPda] = web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("oracle_report"), poolPk.toBuffer(), Buffer.from(scope)], PROGRAM_ID);
     return program.methods
-        .postOracleReport(new anchor.BN(value), toDescBytes(description))
+        .postOracleReport(new anchor.BN(value), scope, toDescBytes(description))
         .accounts({
         oracleAuthority: provider.wallet.publicKey,
         pool: poolPk,
@@ -343,26 +355,26 @@ async function runEarthquakeJob() {
     const { magnitude, place, sources } = await fetchEarthquake();
     const onChainValue = Math.round(magnitude * 100); // M6.5 → 650
     const { approved, reasoning } = await groqValidate(`Earthquake oracle: ${sources}. Is the top magnitude M${magnitude.toFixed(1)} at "${place}" a plausible real-world reading and do both data sources agree?`);
-    const tx = await postReport(new web3_js_1.PublicKey(EARTHQUAKE_POOL), onChainValue, `EQ M${magnitude.toFixed(1)} ${place.slice(0, 40)} | ${reasoning}`);
+    const tx = await postReport(new web3_js_1.PublicKey(EARTHQUAKE_POOL), onChainValue, scopeHash(SCOPE_SEEDS.earthquake), `EQ M${magnitude.toFixed(1)} ${place.slice(0, 40)} | ${reasoning}`);
     console.log(`[oracle:earthquake] M${magnitude.toFixed(1)} value=${onChainValue} approved=${approved} tx=${tx.slice(0, 16)}…`);
 }
 async function runFloodJob() {
     const { gaugeFt, siteName, sources } = await fetchFlood();
     const onChainValue = Math.round(gaugeFt * 10); // 28.3ft → 283
     const { approved, reasoning } = await groqValidate(`Flood oracle: ${sources}. Is gauge height ${gaugeFt.toFixed(1)} ft at "${siteName}" plausible?`);
-    const tx = await postReport(new web3_js_1.PublicKey(FLOOD_POOL), onChainValue, `Flood ${gaugeFt.toFixed(1)}ft ${siteName.slice(0, 30)} | ${reasoning}`);
+    const tx = await postReport(new web3_js_1.PublicKey(FLOOD_POOL), onChainValue, scopeHash(SCOPE_SEEDS.flood), `Flood ${gaugeFt.toFixed(1)}ft ${siteName.slice(0, 30)} | ${reasoning}`);
     console.log(`[oracle:flood] ${gaugeFt.toFixed(1)}ft value=${onChainValue} approved=${approved} tx=${tx.slice(0, 16)}…`);
 }
 async function runCropJob() {
     const { score, sources } = await fetchCropComposite();
     const { approved, reasoning } = await groqValidate(`Crop multi-factor oracle: ${sources}. Is this composite crop stress score plausible?`);
-    const tx = await postReport(new web3_js_1.PublicKey(CROP_POOL), score, `Crop score ${score}/10000 | ${reasoning}`);
+    const tx = await postReport(new web3_js_1.PublicKey(CROP_POOL), score, scopeHash(SCOPE_SEEDS.crop), `Crop score ${score}/10000 | ${reasoning}`);
     console.log(`[oracle:crop] score=${score}/10000 approved=${approved} tx=${tx.slice(0, 16)}…`);
 }
 async function runHurricaneJob() {
     const { windKnots, name, sources } = await fetchHurricane();
     const { approved, reasoning } = await groqValidate(`Hurricane oracle: ${sources}. Is this tropical weather reading plausible?`);
-    const tx = await postReport(new web3_js_1.PublicKey(HURRICANE_POOL), windKnots, `${name} ${windKnots}kt | ${reasoning}`);
+    const tx = await postReport(new web3_js_1.PublicKey(HURRICANE_POOL), windKnots, scopeHash(SCOPE_SEEDS.hurricane), `${name} ${windKnots}kt | ${reasoning}`);
     console.log(`[oracle:hurricane] ${name} ${windKnots}kt approved=${approved} tx=${tx.slice(0, 16)}…`);
 }
 async function runStablecoinJob() {
@@ -370,13 +382,13 @@ async function runStablecoinJob() {
     // Report the lower of USDC/USDT (worst-case depeg)
     const onChainValue = Math.min(usdcBps, usdtBps);
     const { approved, reasoning } = await groqValidate(`Stablecoin oracle: ${sources}. Are these stablecoin prices plausible?`);
-    const tx = await postReport(new web3_js_1.PublicKey(USDC_POOL), onChainValue, `USDC ${(usdcBps / 100).toFixed(2)}¢ USDT ${(usdtBps / 100).toFixed(2)}¢ | ${reasoning}`);
+    const tx = await postReport(new web3_js_1.PublicKey(USDC_POOL), onChainValue, scopeHash(SCOPE_SEEDS.stablecoin), `USDC ${(usdcBps / 100).toFixed(2)}¢ USDT ${(usdtBps / 100).toFixed(2)}¢ | ${reasoning}`);
     console.log(`[oracle:stablecoin] USDC=${usdcBps}bps USDT=${usdtBps}bps approved=${approved} tx=${tx.slice(0, 16)}…`);
 }
 async function runBridgeJob() {
     const { tvlMillions, sources } = await fetchBridgeTvl();
     const { approved, reasoning } = await groqValidate(`Bridge TVL oracle: ${sources}. Is the combined bridge TVL plausible (no active mass exploit)?`);
-    const tx = await postReport(new web3_js_1.PublicKey(BRIDGE_POOL), tvlMillions, `Bridges $${(tvlMillions / 1000).toFixed(1)}B | ${reasoning}`);
+    const tx = await postReport(new web3_js_1.PublicKey(BRIDGE_POOL), tvlMillions, scopeHash(SCOPE_SEEDS.bridge), `Bridges $${(tvlMillions / 1000).toFixed(1)}B | ${reasoning}`);
     console.log(`[oracle:bridge] tvl=$${(tvlMillions / 1000).toFixed(1)}B value=${tvlMillions}M approved=${approved} tx=${tx.slice(0, 16)}…`);
 }
 // ── Scheduler ─────────────────────────────────────────────────────────────

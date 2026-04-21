@@ -45,6 +45,7 @@ async def post_oracle_report(
     pool_pubkey: str,
     reported_value: int,
     description: str,
+    scope_hash: bytes | None = None,
 ) -> str:
     """
     Post an oracle report on-chain for the given pool.
@@ -54,16 +55,17 @@ async def post_oracle_report(
     authority = keypair.pubkey()
 
     pool_pk = Pubkey.from_string(pool_pubkey)
+    scope_hash = scope_hash or hashlib.sha256(b"default").digest()
     pool_config_pk = _find_pda([b"pool_config", bytes(pool_pk)])
-    oracle_report_pk = _find_pda([b"oracle_report", bytes(pool_pk)])
+    oracle_report_pk = _find_pda([b"oracle_report", bytes(pool_pk), scope_hash])
 
     # Anchor discriminator for postOracleReport
     discriminator = _anchor_discriminator("global", "post_oracle_report")
 
-    # Encode: reported_value (i64 LE) + description ([u8; 192])
+    # Encode: reported_value (i64 LE) + scope_hash ([u8; 32]) + description ([u8; 192])
     desc_bytes = description.encode("utf-8")[:191]
     desc_padded = desc_bytes + b"\x00" * (192 - len(desc_bytes))
-    data = discriminator + struct.pack("<q", reported_value) + desc_padded
+    data = discriminator + struct.pack("<q", reported_value) + scope_hash + desc_padded
 
     accounts = [
         AccountMeta(pubkey=authority, is_signer=True, is_writable=True),

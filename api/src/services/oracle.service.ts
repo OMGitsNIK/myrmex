@@ -18,6 +18,7 @@ import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import Groq from "groq-sdk";
 import * as fs from "fs";
 import * as path from "path";
+import { createHash } from "crypto";
 
 // ── Pool addresses ────────────────────────────────────────────────────────
 const EARTHQUAKE_POOL = process.env.EARTHQUAKE_POOL || "EHxPZAMvRhumjFeChfeD9bn2Ju1RWf7RM45pY5vzEhNH";
@@ -33,6 +34,15 @@ const CROP_LON        = process.env.CROP_LON        || "-93.0977";
 const USGS_FLOOD_SITE = process.env.USGS_FLOOD_SITE || "07010000"; // Mississippi @ St. Louis
 const RPC_URL         = process.env.RPC_URL         || "https://api.devnet.solana.com";
 const PROGRAM_ID      = new PublicKey(process.env.PROGRAM_ID || "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan");
+
+const SCOPE_SEEDS = {
+  earthquake: "earthquake:Global",
+  flood: "flood:Mississippi",
+  crop: "crop_multifactor:Iowa",
+  hurricane: "hurricane:global",
+  stablecoin: "stablecoin_depeg:usdc-usdt",
+  bridge: "bridge_hack:wormhole-stargate-across",
+};
 
 // ── Keypair / Program ─────────────────────────────────────────────────────
 
@@ -64,16 +74,25 @@ function toDescBytes(s: string): number[] {
   return Array.from(buf);
 }
 
-async function postReport(poolPk: PublicKey, value: number, description: string): Promise<string> {
+function scopeHash(seed: string): number[] {
+  return Array.from(createHash("sha256").update(seed).digest());
+}
+
+async function postReport(
+  poolPk: PublicKey,
+  value: number,
+  scope: number[],
+  description: string
+): Promise<string> {
   const { program, provider } = getOracleProgram();
   const [poolConfigPda] = PublicKey.findProgramAddressSync(
     [Buffer.from("pool_config"), poolPk.toBuffer()], PROGRAM_ID
   );
   const [oracleReportPda] = PublicKey.findProgramAddressSync(
-    [Buffer.from("oracle_report"), poolPk.toBuffer()], PROGRAM_ID
+    [Buffer.from("oracle_report"), poolPk.toBuffer(), Buffer.from(scope)], PROGRAM_ID
   );
   return program.methods
-    .postOracleReport(new anchor.BN(value), toDescBytes(description))
+    .postOracleReport(new anchor.BN(value), scope, toDescBytes(description))
     .accounts({
       oracleAuthority: provider.wallet.publicKey,
       pool: poolPk,
@@ -366,6 +385,7 @@ async function runEarthquakeJob() {
   const tx = await postReport(
     new PublicKey(EARTHQUAKE_POOL),
     onChainValue,
+    scopeHash(SCOPE_SEEDS.earthquake),
     `EQ M${magnitude.toFixed(1)} ${place.slice(0, 40)} | ${reasoning}`
   );
   console.log(`[oracle:earthquake] M${magnitude.toFixed(1)} value=${onChainValue} approved=${approved} tx=${tx.slice(0, 16)}…`);
@@ -382,6 +402,7 @@ async function runFloodJob() {
   const tx = await postReport(
     new PublicKey(FLOOD_POOL),
     onChainValue,
+    scopeHash(SCOPE_SEEDS.flood),
     `Flood ${gaugeFt.toFixed(1)}ft ${siteName.slice(0, 30)} | ${reasoning}`
   );
   console.log(`[oracle:flood] ${gaugeFt.toFixed(1)}ft value=${onChainValue} approved=${approved} tx=${tx.slice(0, 16)}…`);
@@ -397,6 +418,7 @@ async function runCropJob() {
   const tx = await postReport(
     new PublicKey(CROP_POOL),
     score,
+    scopeHash(SCOPE_SEEDS.crop),
     `Crop score ${score}/10000 | ${reasoning}`
   );
   console.log(`[oracle:crop] score=${score}/10000 approved=${approved} tx=${tx.slice(0, 16)}…`);
@@ -412,6 +434,7 @@ async function runHurricaneJob() {
   const tx = await postReport(
     new PublicKey(HURRICANE_POOL),
     windKnots,
+    scopeHash(SCOPE_SEEDS.hurricane),
     `${name} ${windKnots}kt | ${reasoning}`
   );
   console.log(`[oracle:hurricane] ${name} ${windKnots}kt approved=${approved} tx=${tx.slice(0, 16)}…`);
@@ -429,6 +452,7 @@ async function runStablecoinJob() {
   const tx = await postReport(
     new PublicKey(USDC_POOL),
     onChainValue,
+    scopeHash(SCOPE_SEEDS.stablecoin),
     `USDC ${(usdcBps / 100).toFixed(2)}¢ USDT ${(usdtBps / 100).toFixed(2)}¢ | ${reasoning}`
   );
   console.log(`[oracle:stablecoin] USDC=${usdcBps}bps USDT=${usdtBps}bps approved=${approved} tx=${tx.slice(0, 16)}…`);
@@ -444,6 +468,7 @@ async function runBridgeJob() {
   const tx = await postReport(
     new PublicKey(BRIDGE_POOL),
     tvlMillions,
+    scopeHash(SCOPE_SEEDS.bridge),
     `Bridges $${(tvlMillions / 1000).toFixed(1)}B | ${reasoning}`
   );
   console.log(`[oracle:bridge] tvl=$${(tvlMillions / 1000).toFixed(1)}B value=${tvlMillions}M approved=${approved} tx=${tx.slice(0, 16)}…`);

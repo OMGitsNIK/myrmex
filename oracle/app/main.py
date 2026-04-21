@@ -7,6 +7,7 @@ FastAPI app that:
 """
 import logging
 import asyncio
+import hashlib
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -50,13 +51,19 @@ class ManualReportRequest(BaseModel):
     pool: str
     reported_value: int
     description: str = "Manual oracle report"
+    scope_seed: str = "default"
 
 
 @app.post("/oracle/post-report")
 async def post_report_manual(req: ManualReportRequest):
     """Directly post an oracle report to the given pool (admin/demo use)."""
     try:
-        sig = await chain.post_oracle_report(req.pool, req.reported_value, req.description)
+        sig = await chain.post_oracle_report(
+            req.pool,
+            req.reported_value,
+            req.description,
+            hashlib.sha256(req.scope_seed.encode("utf-8")).digest(),
+        )
         return {"success": True, "signature": sig}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

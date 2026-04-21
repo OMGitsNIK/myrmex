@@ -30,14 +30,19 @@ pub struct TriggerPayout<'info> {
     pub pool_config: Account<'info, PoolConfig>,
 
     /// Oracle report posted by the pool's authorized oracle service.
-    /// Seeds: [b"oracle_report", pool.key()] — one canonical report per pool.
+    /// Seeds: [b"oracle_report", pool.key(), policy.trigger_condition.scope_hash]
     #[account(
-        seeds = [b"oracle_report", pool.key().as_ref()],
+        seeds = [
+            b"oracle_report",
+            pool.key().as_ref(),
+            policy.trigger_condition.scope_hash.as_ref(),
+        ],
         bump = oracle_report.bump,
         constraint = oracle_report.pool == pool.key() @ MyrmexError::WrongOracle,
         constraint = oracle_report.authority == pool_config.oracle_authority @ MyrmexError::WrongOracle,
+        constraint = oracle_report.scope_hash == policy.trigger_condition.scope_hash @ MyrmexError::OracleScopeMismatch,
     )]
-    pub oracle_report: Account<'info, OracleReport>,
+    pub oracle_report: Box<Account<'info, OracleReport>>,
 
     #[account(
         mut,
@@ -76,6 +81,19 @@ pub fn handler(ctx: Context<TriggerPayout>) -> Result<()> {
         require!(age <= OracleReport::MAX_AGE_SECS, MyrmexError::OracleReportStale);
 
         let policy = &ctx.accounts.policy;
+
+        require!(
+            clock.unix_timestamp <= policy.expires_at,
+            MyrmexError::PolicyExpired
+        );
+        require!(
+            oracle_report.reported_at >= policy.created_at,
+            MyrmexError::OracleReportBeforePolicy
+        );
+        require!(
+            oracle_report.reported_at <= policy.expires_at,
+            MyrmexError::PolicyExpired
+        );
 
         // The policy's oracle_pubkey must match the pool's oracle_authority
         require!(

@@ -11,6 +11,7 @@ import {
 } from "@solana/spl-token";
 import * as fs from "fs";
 import * as path from "path";
+import { createHash } from "crypto";
 
 const PROGRAM_ID = new anchor.web3.PublicKey(
   "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan"
@@ -86,6 +87,7 @@ async function main() {
   // Trigger: rainfall < 200 (= 2mm * 100 scale)
   const triggerCondition = {
     oraclePubkey: oracleKp.publicKey,
+    scopeHash: Array.from(createHash("sha256").update("flood:Mississippi").digest()),
     threshold: new anchor.BN(200),  // 200 = 2.00mm scaled
     comparison: 1,                   // LessThan
   };

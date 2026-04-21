@@ -13,6 +13,7 @@ export interface PolicyData {
     premiumAmount: number;
     triggerCondition: {
       oraclePubkey: string;
+      scopeHash: number[];
       threshold: number;
       comparison: number;
     };

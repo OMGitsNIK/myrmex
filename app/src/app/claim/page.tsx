@@ -7,6 +7,7 @@ import {
   explorerUrl,
   COVERAGE_NAMES,
   COMPARISON_LABELS,
+  PROGRAM_ID,
   USDC_DECIMALS,
 } from "@/lib/constants";
 import * as anchor from "@coral-xyz/anchor";
@@ -14,13 +15,12 @@ import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { toast } from "sonner";
 
-const PROGRAM_ID = new PublicKey("9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan");
-
 interface PolicyInfo {
   pubkey: string;
   coverageType: number;
   threshold: number;
   comparison: number;
+  scopeHash: number[];
   isActive: boolean;
   isClaimed: boolean;
   payoutAmount: number;
@@ -65,6 +65,7 @@ export default function ClaimPage() {
           coverageType: data.account.coverageType,
           threshold: tc.threshold,
           comparison: tc.comparison,
+          scopeHash: tc.scopeHash,
           isActive: data.account.isActive,
           isClaimed: data.account.isClaimed,
           payoutAmount: data.account.payoutAmount / USDC_DECIMALS,
@@ -74,7 +75,9 @@ export default function ClaimPage() {
 
         // Also check oracle report freshness
         const oracleRes = await fetch(
-          `${API_URL}/api/oracle-report/${data.account.pool}`
+          `${API_URL}/api/oracle-report/${data.account.pool}?scope_hash=${tc.scopeHash
+            .map((b: number) => b.toString(16).padStart(2, "0"))
+            .join("")}`
         ).catch(() => null);
         if (oracleRes?.ok) {
           const oracleData = await oracleRes.json();
@@ -118,7 +121,11 @@ export default function ClaimPage() {
         PROGRAM_ID
       );
       const [oracleReportPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("oracle_report"), poolPk.toBuffer()],
+        [
+          Buffer.from("oracle_report"),
+          poolPk.toBuffer(),
+          Buffer.from(policyInfo.scopeHash),
+        ],
         PROGRAM_ID
       );
 

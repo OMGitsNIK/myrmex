@@ -3,11 +3,16 @@ Scheduled oracle jobs — one per coverage type.
 Each job: fetch data → Claude verification → post on-chain if triggered.
 """
 import logging
+import hashlib
 from datetime import date, timedelta
 from app import data_sources, ai_verifier, chain
 from app.config import FLIGHT_POOL, CROP_POOL, DEFI_POOL
 
 logger = logging.getLogger("oracle")
+
+
+def _scope(seed: str) -> bytes:
+    return hashlib.sha256(seed.encode("utf-8")).digest()
 
 
 async def run_crop_drought_job():
@@ -36,7 +41,12 @@ async def run_crop_drought_job():
             f"AI: {verification['reasoning']}"
         )
 
-        sig = await chain.post_oracle_report(CROP_POOL, reported_value, description)
+        sig = await chain.post_oracle_report(
+            CROP_POOL,
+            reported_value,
+            description,
+            _scope("crop_multifactor:Iowa"),
+        )
         logger.info(f"Crop oracle report posted: {sig}")
     except Exception as e:
         logger.error(f"Crop oracle job failed: {e}")
@@ -72,7 +82,12 @@ async def run_defi_hack_job():
             f"AI: {verification['reasoning']}"
         )
 
-        sig = await chain.post_oracle_report(DEFI_POOL, reported_value, description)
+        sig = await chain.post_oracle_report(
+            DEFI_POOL,
+            reported_value,
+            description,
+            _scope("bridge_hack:wormhole-stargate-across"),
+        )
         logger.info(f"DeFi oracle report posted: {sig}")
     except Exception as e:
         logger.error(f"DeFi oracle job failed: {e}")
@@ -102,7 +117,12 @@ async def run_flight_job():
             f"AI: {verification['reasoning']}"
         )
 
-        sig = await chain.post_oracle_report(FLIGHT_POOL, reported_value, description)
+        sig = await chain.post_oracle_report(
+            FLIGHT_POOL,
+            reported_value,
+            description,
+            _scope("flight_delay:default"),
+        )
         logger.info(f"Flight oracle report posted: {sig}")
     except Exception as e:
         logger.error(f"Flight oracle job failed: {e}")

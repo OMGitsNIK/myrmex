@@ -81,6 +81,10 @@ pub fn handler(
         expires_at > clock.unix_timestamp,
         MyrmexError::PolicyExpired
     );
+    require!(
+        coverage_type == ctx.accounts.pool.pool_type,
+        MyrmexError::Unauthorized
+    );
 
     // Oracle pubkey must be the pool's authoritative oracle — not the user's wallet
     require!(

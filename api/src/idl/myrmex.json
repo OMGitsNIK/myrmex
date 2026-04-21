@@ -821,6 +821,10 @@
               {
                 "kind": "account",
                 "path": "pool"
+              },
+              {
+                "kind": "arg",
+                "path": "scope_hash"
               }
             ]
           }
@@ -834,6 +838,15 @@
         {
           "name": "reported_value",
           "type": "i64"
+        },
+        {
+          "name": "scope_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
         },
         {
           "name": "description",
@@ -1126,7 +1139,7 @@
           "name": "oracle_report",
           "docs": [
             "Oracle report posted by the pool's authorized oracle service.",
-            "Seeds: [b\"oracle_report\", pool.key()] — one canonical report per pool."
+            "Seeds: [b\"oracle_report\", pool.key(), policy.trigger_condition.scope_hash]"
           ],
           "pda": {
             "seeds": [
@@ -1151,6 +1164,11 @@
               {
                 "kind": "account",
                 "path": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "policy.trigger_condition.scope_hash",
+                "account": "PolicyVault"
               }
             ]
           }
@@ -1726,6 +1744,16 @@
     },
     {
       "code": 6016,
+      "name": "OracleReportBeforePolicy",
+      "msg": "Oracle report was posted before this policy was created"
+    },
+    {
+      "code": 6017,
+      "name": "OracleScopeMismatch",
+      "msg": "Oracle report scope does not match this policy"
+    },
+    {
+      "code": 6018,
       "name": "InvalidConfig",
       "msg": "Invalid configuration parameter"
     }
@@ -1822,6 +1850,19 @@
               "Which pool this report is for"
             ],
             "type": "pubkey"
+          },
+          {
+            "name": "scope_hash",
+            "docs": [
+              "Domain-specific risk scope. Multiple regions/assets/gauges can share a pool",
+              "without sharing the same latest oracle report."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           },
           {
             "name": "reported_value",
@@ -2151,6 +2192,19 @@
           {
             "name": "oracle_pubkey",
             "type": "pubkey"
+          },
+          {
+            "name": "scope_hash",
+            "docs": [
+              "Domain-specific risk scope, such as region/gauge/asset/route hash.",
+              "Payouts require an oracle report posted for the same scope."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           },
           {
             "name": "threshold",
