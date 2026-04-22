@@ -25,17 +25,14 @@ export interface Quote {
 
 // Local actuarial fallback used when the pricing API is unreachable.
 function localFallbackQuote(params: QuoteRequest): Quote {
+  // Rates are floored at 5% (500 bps) to match on-chain minPremiumBps
   const base: Record<string, number> = {
-    earthquake:        0.010,
-    flood:             0.015,
-    crop_multifactor:  0.025,
-    hurricane:         0.030,
-    stablecoin_depeg:  0.003,
-    bridge_hack:       0.020,
-    // legacy
-    flight_delay:      0.025,
-    crop_drought:      0.045,
-    defi_hack:         0.060,
+    earthquake:        0.055,
+    flood:             0.060,
+    crop_multifactor:  0.075,
+    hurricane:         0.080,
+    stablecoin_depeg:  0.050,
+    bridge_hack:       0.065,
   };
   const rate = base[params.coverage_type] ?? 0.03;
   const durationFactor = Math.min(params.duration_days / 30, 3);

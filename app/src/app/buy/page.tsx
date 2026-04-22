@@ -132,6 +132,11 @@ export default function BuyPage() {
       const poolConfigPda = new PublicKey(matchingPool.poolConfig.pubkey);
       const oracleAuthority = new PublicKey(matchingPool.poolConfig.oracleAuthority);
       const poolVault = new PublicKey(matchingPool.vault);
+
+      // Enforce on-chain minimum premium floor before sending
+      const minPremiumBps: number = matchingPool.poolConfig.minPremiumBps ?? 500;
+      const floorPremiumUsdc = (payoutAmount * minPremiumBps) / 10_000;
+      const effectivePremiumUsdc = Math.max(quote.premium_usdc, floorPremiumUsdc);
       const scopeHash = await scopeHashBytes(
         policyScopeSeed(selectedType.id, selectedType.key, extraValues)
       );
@@ -169,7 +174,7 @@ export default function BuyPage() {
         .createPolicy(
           selectedType.id,
           new anchor.BN(Math.floor(payoutAmount * 1_000_000)),
-          new anchor.BN(Math.floor(quote.premium_usdc * 1_000_000)),
+          new anchor.BN(Math.floor(effectivePremiumUsdc * 1_000_000)),
           triggerCondition,
           new anchor.BN(Math.floor(Date.now() / 1000) + durationDays * 86400),
           nonce
@@ -191,7 +196,7 @@ export default function BuyPage() {
           txSig: tx,
           coverageType: selectedType.name,
           payoutAmount,
-          premiumPaid: quote.premium_usdc,
+          premiumPaid: effectivePremiumUsdc,
           expiresAt: new Date(Date.now() + durationDays * 86400_000),
           threshold,
           thresholdDisplay: selectedType.thresholdDisplay(threshold),
@@ -415,11 +420,18 @@ export default function BuyPage() {
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-gray-400 text-sm">Premium</span>
-              <span className="text-white font-bold text-lg">${quote.premium_usdc.toFixed(2)} USDC</span>
+              <div className="text-right">
+                <span className="text-white font-bold text-lg">
+                  ${Math.max(quote.premium_usdc, (payoutAmount * 500) / 10_000).toFixed(2)} USDC
+                </span>
+                {quote.premium_usdc < (payoutAmount * 500) / 10_000 && (
+                  <div className="text-xs text-yellow-500">Floor applied (5% min)</div>
+                )}
+              </div>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-400 text-sm">Rate</span>
-              <span className="text-white">{quote.premium_pct.toFixed(3)}% of payout</span>
+              <span className="text-white">{Math.max(quote.premium_pct, 5).toFixed(3)}% of payout</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-400 text-sm">Risk Score</span>
