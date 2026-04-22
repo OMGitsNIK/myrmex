@@ -78,6 +78,15 @@ pub mod myrmex {
         instructions::expire_policy::handler(ctx)
     }
 
+    pub fn update_pool_config(
+        ctx: Context<UpdatePoolConfig>,
+        oracle_authority: Pubkey,
+        min_premium_bps: u64,
+        max_coverage_bps: u64,
+    ) -> Result<()> {
+        instructions::update_pool_config::handler(ctx, oracle_authority, min_premium_bps, max_coverage_bps)
+    }
+
     pub fn stake_myr(ctx: Context<StakeMyr>, amount: u64) -> Result<()> {
         instructions::stake_myr::handler(ctx, amount)
     }

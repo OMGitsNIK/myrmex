@@ -2,6 +2,9 @@
 
 import { API_URL, COVERAGE_NAMES, USDC_DECIMALS } from "@/lib/constants";
 import { useEffect, useState } from "react";
+import { useAnchorProgram } from "@/hooks/useAnchorProgram";
+import { PublicKey } from "@solana/web3.js";
+import { toast } from "sonner";
 
 interface StatsResponse {
   total_tvl_usdc: number;
@@ -279,16 +282,130 @@ export default function AdminPage() {
 
           <div className="card p-6 space-y-3 text-sm text-gray-400">
             <p>
-              This page is read-only and does not require a wallet. It pulls from{" "}
+              Metrics sourced from{" "}
               <code className="text-[var(--accent)]">/api/stats</code> and{" "}
-              <code className="text-[var(--accent)]">/api/pools</code> using the configured API base URL.
+              <code className="text-[var(--accent)]">/api/pools</code>. Values reflect on-chain state at last poll.
             </p>
             <p>
-              TVL values are displayed in USDC by converting on-chain token amounts from 6-decimal base units.
+              <span className="text-yellow-400 font-medium">Pricing note:</span> The actuarial quote is advisory. The on-chain
+              floor (<code className="text-[var(--accent)]">min_premium_bps</code> in{" "}
+              <code className="text-[var(--accent)]">pool_config</code>) is the only enforced minimum.
             </p>
           </div>
         </div>
       </div>
+
+      {/* Pool Config Update Panel */}
+      <UpdatePoolConfigPanel pools={pools} />
+    </div>
+  );
+}
+
+function UpdatePoolConfigPanel({ pools }: { pools: PoolResponse[] }) {
+  const { program, wallet } = useAnchorProgram();
+  const PROGRAM_ID = new PublicKey("9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan");
+
+  const [selectedPool, setSelectedPool] = useState("");
+  const [oracleAuthority, setOracleAuthority] = useState("");
+  const [minPremiumBps, setMinPremiumBps] = useState("500");
+  const [maxCoverageBps, setMaxCoverageBps] = useState("8000");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleUpdate = async () => {
+    if (!program || !wallet) { toast.error("Connect pool authority wallet"); return; }
+    if (!selectedPool) { toast.error("Select a pool"); return; }
+    let oraclePk: PublicKey;
+    try { oraclePk = new PublicKey(oracleAuthority); } catch { toast.error("Invalid oracle authority pubkey"); return; }
+    const minBps = parseInt(minPremiumBps);
+    const maxBps = parseInt(maxCoverageBps);
+    if (!isFinite(minBps) || minBps < 0 || minBps > 10000) { toast.error("min_premium_bps must be 0–10000"); return; }
+    if (!isFinite(maxBps) || maxBps < 1 || maxBps > 10000) { toast.error("max_coverage_bps must be 1–10000"); return; }
+
+    setSubmitting(true);
+    try {
+      const poolPk = new PublicKey(selectedPool);
+      const [poolConfigPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("pool_config"), poolPk.toBuffer()],
+        PROGRAM_ID
+      );
+      const { BN } = await import("@coral-xyz/anchor");
+      await (program as any).methods
+        .updatePoolConfig(oraclePk, new BN(minBps), new BN(maxBps))
+        .accounts({ authority: wallet.publicKey, pool: poolPk, poolConfig: poolConfigPda })
+        .rpc();
+      toast.success("pool_config updated on-chain");
+    } catch (e: unknown) {
+      toast.error("Update failed", { description: (e as Error).message });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="card p-6 space-y-5">
+      <div>
+        <h2 className="font-semibold text-white">Update Pool Config</h2>
+        <p className="text-xs text-gray-500 mt-1">
+          Rotate oracle authority or adjust premium floor / coverage cap. Requires pool authority wallet.
+        </p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <label className="space-y-1">
+          <span className="text-xs text-gray-500">Pool</span>
+          <select
+            value={selectedPool}
+            onChange={(e) => setSelectedPool(e.target.value)}
+            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white text-sm focus:border-[var(--accent)]/50 outline-none"
+          >
+            <option value="">— select pool —</option>
+            {pools.map((p) => (
+              <option key={p.pubkey} value={p.pubkey}>
+                {COVERAGE_NAMES[p.poolType] ?? `Type ${p.poolType}`} — {p.pubkey.slice(0, 8)}…
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-1">
+          <span className="text-xs text-gray-500">New Oracle Authority (pubkey)</span>
+          <input
+            type="text"
+            value={oracleAuthority}
+            onChange={(e) => setOracleAuthority(e.target.value)}
+            placeholder="GeBW6LUY…"
+            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white text-sm font-mono focus:border-[var(--accent)]/50 outline-none"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-xs text-gray-500">Min Premium bps (0–10000)</span>
+          <input
+            type="number"
+            value={minPremiumBps}
+            onChange={(e) => setMinPremiumBps(e.target.value)}
+            min={0} max={10000} step={1}
+            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white text-sm focus:border-[var(--accent)]/50 outline-none"
+          />
+          <span className="text-xs text-gray-600">{(parseInt(minPremiumBps) / 100 || 0).toFixed(2)}% of payout</span>
+        </label>
+        <label className="space-y-1">
+          <span className="text-xs text-gray-500">Max Coverage bps (1–10000)</span>
+          <input
+            type="number"
+            value={maxCoverageBps}
+            onChange={(e) => setMaxCoverageBps(e.target.value)}
+            min={1} max={10000} step={1}
+            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white text-sm focus:border-[var(--accent)]/50 outline-none"
+          />
+          <span className="text-xs text-gray-600">{(parseInt(maxCoverageBps) / 100 || 0).toFixed(2)}% of pool TVL</span>
+        </label>
+      </div>
+      <button
+        onClick={handleUpdate}
+        disabled={submitting || !wallet}
+        className="bg-[var(--accent)] hover:opacity-90 disabled:opacity-40 text-black font-bold px-6 py-2 rounded-lg text-sm transition-opacity"
+      >
+        {submitting ? "Updating…" : "Update Pool Config"}
+      </button>
+      {!wallet && <p className="text-xs text-gray-600">Connect the pool authority wallet to update config.</p>}
     </div>
   );
 }

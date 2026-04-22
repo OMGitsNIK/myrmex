@@ -9,6 +9,7 @@ pub mod initialize_pool_config;
 pub mod post_oracle_report;
 pub mod stake_myr;
 pub mod trigger_payout;
+pub mod update_pool_config;
 pub mod withdraw_lp;
 
 pub use cast_vote::*;
@@ -20,4 +21,5 @@ pub use initialize_pool_config::*;
 pub use post_oracle_report::*;
 pub use stake_myr::*;
 pub use trigger_payout::*;
+pub use update_pool_config::*;
 pub use withdraw_lp::*;

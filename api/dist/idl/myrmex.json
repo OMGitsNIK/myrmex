@@ -1283,6 +1283,71 @@
       "args": []
     },
     {
+      "name": "update_pool_config",
+      "discriminator": [
+        68,
+        236,
+        203,
+        122,
+        179,
+        62,
+        234,
+        252
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool"
+        },
+        {
+          "name": "pool_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "oracle_authority",
+          "type": "pubkey"
+        },
+        {
+          "name": "min_premium_bps",
+          "type": "u64"
+        },
+        {
+          "name": "max_coverage_bps",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "withdraw_lp",
       "discriminator": [
         225,
