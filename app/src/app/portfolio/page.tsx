@@ -44,7 +44,6 @@ function PolicyCard({ p }: { p: PolicyData }) {
     : { label: "● Active", color: "bg-[var(--accent-dim)] text-[var(--accent)]" };
 
   const tc = acc.triggerCondition;
-  const compLabel = COMPARISON_LABELS[tc.comparison] || "?";
 
   return (
     <div className="card card-hover p-6 space-y-4">
