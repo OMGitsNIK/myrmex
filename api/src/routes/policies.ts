@@ -4,20 +4,16 @@ import { getAnchorProgram } from "../services/anchor.service";
 
 const router = Router();
 
-// New PolicyVault = 8 (disc) + 181 (data) = 189 bytes. Skip old 149-byte accounts.
-const NEW_POLICY_VAULT_SIZE = 189;
-
 // GET /api/policies/:wallet
 router.get("/:wallet", async (req, res) => {
   try {
     const { program, connection } = getAnchorProgram();
     const wallet = new PublicKey(req.params.wallet);
 
+    // Fetch all PolicyVault accounts for this wallet regardless of size,
+    // then decode per-account so old-format accounts are silently skipped.
     const rawAccounts = await connection.getProgramAccounts(program.programId, {
-      filters: [
-        { dataSize: NEW_POLICY_VAULT_SIZE },
-        { memcmp: { offset: 8, bytes: wallet.toBase58() } },
-      ],
+      filters: [{ memcmp: { offset: 8, bytes: wallet.toBase58() } }],
     });
 
     const results: any[] = [];
