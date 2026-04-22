@@ -4,26 +4,32 @@ import { getAnchorProgram } from "../services/anchor.service";
 
 const router = Router();
 
+// New PolicyVault = 8 (disc) + 181 (data) = 189 bytes. Skip old 149-byte accounts.
+const NEW_POLICY_VAULT_SIZE = 189;
+
 // GET /api/policies/:wallet
 router.get("/:wallet", async (req, res) => {
   try {
-    const { program } = getAnchorProgram();
+    const { program, connection } = getAnchorProgram();
     const wallet = new PublicKey(req.params.wallet);
 
-    const policies = await (program as any).account.policyVault.all([
-      {
-        memcmp: {
-          offset: 8, // after discriminator
-          bytes: wallet.toBase58(),
-        },
-      },
-    ]);
+    const rawAccounts = await connection.getProgramAccounts(program.programId, {
+      filters: [
+        { dataSize: NEW_POLICY_VAULT_SIZE },
+        { memcmp: { offset: 8, bytes: wallet.toBase58() } },
+      ],
+    });
 
-    res.json(
-      policies.map(({ publicKey, account }) => {
-        const acc = account as any;
-        return {
-          pubkey: publicKey.toBase58(),
+    const results: any[] = [];
+    for (const { pubkey, account } of rawAccounts) {
+      try {
+        const decoded = (program as any).coder.accounts.decode(
+          "policyVault",
+          account.data
+        );
+        const acc = decoded as any;
+        results.push({
+          pubkey: pubkey.toBase58(),
           account: {
             policyholder: acc.policyholder.toBase58(),
             pool: acc.pool.toBase58(),
@@ -42,9 +48,13 @@ router.get("/:wallet", async (req, res) => {
             isClaimed: acc.isClaimed,
             bump: acc.bump,
           },
-        };
-      })
-    );
+        });
+      } catch {
+        // Skip accounts that fail deserialization (old format, corrupted, etc.)
+      }
+    }
+
+    res.json(results);
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }

@@ -11,7 +11,7 @@ let _program: anchor.Program | null = null;
 let _provider: anchor.AnchorProvider | null = null;
 
 export function getAnchorProgram() {
-  if (_program && _provider) return { program: _program, provider: _provider };
+  if (_program && _provider) return { program: _program, provider: _provider, connection: _provider.connection };
 
   const connection = new Connection(RPC_URL, "confirmed");
 
@@ -45,6 +45,7 @@ export function getAnchorProgram() {
   return {
     program: _program,
     provider: _provider,
+    connection,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     accounts: (_program as any).account as Record<string, any>,
   };
