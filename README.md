@@ -60,7 +60,7 @@ A pool of USDC backing one category of coverage. Liquidity providers deposit int
 
 ```
 authority       → who created the pool (admin pubkey)
-pool_type       → u8: 0=flight, 1=crop_drought, 3=defi_hack
+pool_type       → u8: 0=earthquake, 1=flood, 2=crop_multifactor, 3=hurricane, 4=stablecoin_depeg, 5=bridge_hack
 vault           → ATA holding all USDC (owned by pool PDA — only program can sign)
 lp_token_mint   → mint for LP tokens (also a PDA — only program can mint)
 total_liquidity → total USDC deposited by LPs
@@ -84,6 +84,7 @@ payout_amount   → USDC lamports to transfer on trigger
 premium_amount  → USDC lamports paid upfront
 trigger_condition:
   oracle_pubkey → the key that must sign trigger_payout
+  scope_hash    → sha256 of scope seed (e.g. "earthquake:Global") — binds report to risk domain
   threshold     → i64 value to compare against
   comparison    → 0=GreaterThan, 1=LessThan, 2=Equal
 expires_at      → unix timestamp — policy void after this
@@ -150,33 +151,42 @@ LPs cannot drain collateral that belongs to active policyholders.
 
 A Python FastAPI service that runs actuarial models to price premiums. Judges a fair premium by modeling historical probability of the trigger firing.
 
-**`POST /quote`** routes to one of three models:
+**`POST /quote`** routes to one of six actuarial models:
 
-**Flight model** (`models/flight_model.py`): `base_rate × route_risk_factor × threshold_factor × duration_factor`  
-A tighter delay threshold (60 min) means more flights qualify → higher premium. A longer route with worse on-time history is riskier → higher premium.
+| Coverage type | Key risk driver | Oracle source |
+|---------------|----------------|---------------|
+| `earthquake` | Gutenberg-Richter magnitude-frequency | USGS Earthquake API |
+| `flood` | Stage-frequency curve for river gauge | USGS Water Services |
+| `crop_multifactor` | Composite stress score CDF | Open-Meteo dual-source |
+| `hurricane` | Saffir-Simpson wind-frequency | NOAA NHC + Weather.gov |
+| `stablecoin_depeg` | Historical depeg event frequency | CoinGecko dual-endpoint |
+| `bridge_hack` | TVL drop velocity vs $1.73B baseline | DeFiLlama TVL + hacks |
 
-**Weather model** (`models/weather_model.py`): `rainfall_probability × payout × duration_adjustment`  
-Uses historical rainfall distribution for the region to estimate probability of dropping below threshold.
-
-**DeFi model** (`models/defi_model.py`): `tvl_tier_rate × hack_frequency × coverage_period`  
-Smaller protocols have higher hack frequency per dollar. Longer coverage periods are more expensive.
+Premium formula: `max(min_floor, E[loss] × vol_loading × util_loading)`.  
+Floor is 500 bps (5%) of payout — enforced both by the pricing engine and on-chain `pool_config.min_premium_bps`.
 
 Each model returns:
 ```json
 {
-  "premium_usdc": 22.46,
-  "risk_score": 41,
-  "model_version": "1.0.0",
-  "coverage_type": "flight_delay"
+  "premium_usdc": 53.19,
+  "premium_pct": 5.319,
+  "risk_score": 4.11,
+  "confidence": "high",
+  "breakdown": {
+    "annual_probability": 0.4,
+    "period_probability": 0.041,
+    "expected_loss_usdc": 41.12,
+    "vol_loading": 1.15,
+    "util_loading": 1.125
+  }
 }
 ```
-The `risk_score` (0–100) drives the colour indicator on the frontend: green (<30), yellow (30–70), red (>70).
 
 ```bash
-# Test it locally
-curl -X POST http://localhost:8000/quote \
+# Test it
+curl -X POST https://myrmex-pricing-production.up.railway.app/quote \
   -H "Content-Type: application/json" \
-  -d '{"coverage_type":"flight_delay","payout_amount_usdc":100,"duration_days":30,"origin":"BOM","destination":"DEL","delay_threshold_minutes":120}'
+  -d '{"coverage_type":"earthquake","payout_amount_usdc":1000,"duration_days":30,"min_magnitude":6.5,"seismic_region":"Global"}'
 ```
 
 ---
@@ -194,7 +204,7 @@ Uses Anchor's `program.account.riskPool.all()` and `program.account.policyVault.
 **3. Simulate triggers (demo)**  
 `POST /api/simulate-trigger` takes a policy pubkey, fetches it, and sends a signed `trigger_payout` instruction using the server keypair. This is what the demo page uses — it lets you experience the full flow without needing a real oracle integration.
 
-**Cron job:** Runs every 60 seconds, fetches all active policies, and calls `expire_policy` for any past their `expires_at`. This ensures locked collateral is freed automatically without manual intervention.
+**Cron job:** Runs every 5 minutes. Posts oracle reports for all 6 pools with correct `scope_hash` bindings, and calls `expire_policy` for any policy past `expires_at`. Oracle reports have a 24-hour freshness window enforced on-chain.
 
 ```
 GET  /api/pools                          all risk pools from chain
@@ -213,7 +223,7 @@ Next.js 14 App Router with TypeScript. Connects to Phantom wallet via `@solana/w
 
 **Pages:**
 
-`/buy` — Choose coverage type (flight / crop drought / DeFi hack), set payout amount, duration, and trigger threshold. Live AI quote updates as you type. Click Buy → sign one transaction → policy is created on-chain.
+`/buy` — Choose from 6 coverage types (earthquake, flood, crop multi-factor, hurricane, stablecoin depeg, bridge hack). Set payout amount, duration, and trigger threshold using preset buttons or custom values. Live actuarial quote updates as you type with full breakdown. Click Buy → sign one transaction → policy created on-chain.
 
 `/pool` — See all active risk pools fetched from chain. Enter a USDC amount and click Deposit → sign one transaction → receive LP tokens.
 
@@ -280,7 +290,7 @@ npx ts-node tests/e2e/full-flow.ts
 |---|------|----------------|
 | 1 | Initialize risk pool | PDA derivation correct, vault created |
 | 2 | LP funds pool, receives LP tokens | Pro-rata mint math, pool PDA signing |
-| 3 | User creates flight delay policy | Premium transfer, collateral lock |
+| 3 | User creates earthquake policy | Premium transfer, collateral lock, scope_hash binding |
 | 4 | Oracle triggers payout | Condition check, CEI transfer |
 | 5 | Double-payout rejected | `is_claimed` guard works |
 | 6 | Expire policy frees collateral | Cron automation path |
@@ -310,9 +320,9 @@ anchor test
        │  │   Node/Express    │      │   Python FastAPI       │
        │  │   port 3001       │      │   port 8000            │
        │  │                   │      │                        │
-       │  │  Anchor client    │      │  Flight model          │
-       │  │  SQLite indexer   │      │  Weather model         │
-       │  │  60s cron job     │      │  DeFi model            │
+       │  │  Anchor client    │      │  6 actuarial models    │
+       │  │  SQLite indexer   │      │  (EQ/Flood/Crop/       │
+       │  │  5min cron+oracle │      │   Hurricane/Depeg/Hack)│
        │  └────────┬──────────┘      └────────────────────────┘
        │           │ Anchor RPC
        ▼           ▼
@@ -339,10 +349,10 @@ anchor test
 
 ## Known Limitations
 
-1. **Mock oracle**: The demo uses any connected wallet as the oracle. Production would integrate Switchboard or Pyth for trustless real-world data feeds.
-2. **Single pool admin**: Pool creation requires a single authority keypair. Multi-sig governance is scaffolded (MYR staking + vote instructions exist) but not yet deployed.
-3. **No mainnet**: Devnet only. Do not deploy with real funds without a professional security audit.
-4. **AI pricing is illustrative**: The actuarial models use simplified risk curves. A production version would use real historical flight/weather/protocol data.
+1. **Oracle authority**: Oracle reports are posted by a permissioned keypair (`oracle_authority` in `pool_config`). Production would integrate Switchboard or Pyth for trustless, manipulation-resistant feeds.
+2. **Pool config is immutable**: No update path for `oracle_authority`, `min_premium_bps`, or `max_coverage_bps` once set. A governance-gated `update_pool_config` instruction is planned for v2.1.
+3. **Governance proposals are off-chain**: MYR staking and `cast_vote` instructions exist on-chain, but proposal creation and indexing are not yet fully on-chain.
+4. **No mainnet**: Devnet only. Do not deploy with real funds without a professional security audit.
 
 ---
 
@@ -353,7 +363,7 @@ anchor test
 | Smart contract | Rust + Anchor 0.32.1 |
 | Network | Solana Devnet |
 | Frontend | Next.js 14, TypeScript, Tailwind CSS |
-| Wallet | @solana/wallet-adapter (Phantom) |
+| Wallet | @solana/wallet-adapter (Phantom, Solflare, Coinbase, Torus) |
 | REST API | Node.js, Express, TypeScript, SQLite |
 | Pricing engine | Python 3.11, FastAPI, Pydantic |
 | Testing | Anchor/Mocha (8 integration tests) |

@@ -34,8 +34,8 @@ describe("myrmex", () => {
   let policyPda: anchor.web3.PublicKey;
   let policyNonce: anchor.BN;
 
-  const POOL_TYPE = 0; // Flight
-  const SCOPE_HASH = Array(32).fill(7);
+  const POOL_TYPE = 0; // Earthquake (type 0)
+  const SCOPE_HASH = Array(32).fill(7); // sha256("earthquake:Global") placeholder for localnet
 
   before(async () => {
     // Airdrop SOL to test wallets
@@ -100,7 +100,7 @@ describe("myrmex", () => {
   // ── Test 1: Initialize pool ──────────────────────────────────────────────────
   it("1. Initialize risk pool", async () => {
     const poolName = new Uint8Array(32);
-    const nameStr = "Flight-Global";
+    const nameStr = "Earthquake-Pacific";
     for (let i = 0; i < nameStr.length; i++)
       poolName[i] = nameStr.charCodeAt(i);
 
@@ -186,7 +186,7 @@ describe("myrmex", () => {
   });
 
   // ── Test 3: Create policy ────────────────────────────────────────────────────
-  it("3. User creates flight delay policy", async () => {
+  it("3. User creates earthquake policy", async () => {
     // Mint 100 USDC to policyholder
     await createAssociatedTokenAccount(
       connection,
