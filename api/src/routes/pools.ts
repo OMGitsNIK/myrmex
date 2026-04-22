@@ -18,11 +18,26 @@ const PROGRAM_ID = new PublicKey(
   process.env.PROGRAM_ID || "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan"
 );
 
+// Canonical pool addresses — only these appear in /api/pools.
+// Populated from env vars (POOL_TYPE_0 … POOL_TYPE_5) with devnet defaults.
+const CANONICAL_POOLS = new Set<string>([
+  process.env.POOL_TYPE_0 || "EHxPZAMvRhumjFeChfeD9bn2Ju1RWf7RM45pY5vzEhNH",
+  process.env.POOL_TYPE_1 || "HfyGsQVVsxt6BNM7UzTepBo91DKYdqLy7RKuLrwnM1YY",
+  process.env.POOL_TYPE_2 || "HuPG3dmBftRCAwg71tro7pmp2hjoCT8KWaNtytwUqUo2",
+  process.env.POOL_TYPE_3 || "ZZWgmeRUSdQyuarSb2zPFron2x88UgexhTQn8hJr9uD",
+  process.env.POOL_TYPE_4 || "CcGbU74HpT8sjDU5NDDWFzBPYEARBEfAac4ovDWwgxWU",
+  process.env.POOL_TYPE_5 || "AqKUYemw3A6GbYFnCFwE9S1f1QCfhH4EAjFQCDxyfUtQ",
+]);
+
 // GET /api/pools
 router.get("/", async (_req, res) => {
   try {
     const { program } = getAnchorProgram();
-    const pools = await (program as any).account.riskPool.all();
+    const allPools = await (program as any).account.riskPool.all();
+    // Filter to canonical addresses to prevent spoof pools from appearing
+    const pools = allPools.filter(({ publicKey }: { publicKey: PublicKey }) =>
+      CANONICAL_POOLS.has(publicKey.toBase58())
+    );
 
     const result = await Promise.all(
       pools.map(async ({ publicKey, account }) => {

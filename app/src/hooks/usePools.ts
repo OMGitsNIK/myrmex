@@ -25,9 +25,13 @@ export function usePools() {
   useEffect(() => {
     setLoading(true);
     fetch(`${API_URL}/api/pools`)
-      .then((r) => r.json())
-      .then((data: PoolData[]) => {
-        setPools(data);
+      .then((r) => {
+        if (!r.ok) throw new Error(`API error ${r.status}`);
+        return r.json();
+      })
+      .then((data: unknown) => {
+        if (!Array.isArray(data)) throw new Error("Unexpected API response shape");
+        setPools(data as PoolData[]);
         setError(null);
       })
       .catch((e) => setError(e.message))

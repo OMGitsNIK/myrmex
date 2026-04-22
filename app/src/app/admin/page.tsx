@@ -148,7 +148,7 @@ export default function AdminPage() {
         <div>
           <h1 className="text-3xl font-bold text-white tracking-tight">Protocol Admin</h1>
           <p className="text-gray-400 mt-2">
-            Live protocol-wide health metrics, pool breakdowns, and payout activity.
+            Protocol metrics sourced from the API indexer. Values reflect on-chain state at last poll — not a real-time ledger.
           </p>
         </div>
         <div className="text-xs text-gray-500">

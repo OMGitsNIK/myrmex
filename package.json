@@ -1,8 +1,8 @@
 {
   "license": "ISC",
   "scripts": {
-    "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
-    "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check"
+    "lint:fix": "prettier \"**/*.{js,ts}\" --ignore-path .prettierignore -w",
+    "lint": "prettier \"**/*.{js,ts}\" --ignore-path .prettierignore --check"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",

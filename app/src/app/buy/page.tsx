@@ -313,10 +313,14 @@ export default function BuyPage() {
             <input
               type="number"
               value={payoutAmount}
-              onChange={(e) => setPayoutAmount(Number(e.target.value))}
+              onChange={(e) => {
+                const v = Math.floor(Number(e.target.value));
+                if (isFinite(v) && v >= 10 && v <= selectedType.maxPayout) setPayoutAmount(v);
+              }}
               className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white focus:border-[var(--accent)]/50 outline-none transition-colors"
               min={10}
               max={selectedType.maxPayout}
+              step={1}
             />
           </label>
           <label className="space-y-1">
@@ -324,10 +328,14 @@ export default function BuyPage() {
             <input
               type="number"
               value={durationDays}
-              onChange={(e) => setDurationDays(Number(e.target.value))}
+              onChange={(e) => {
+                const v = Math.floor(Number(e.target.value));
+                if (isFinite(v) && v >= 1 && v <= 365) setDurationDays(v);
+              }}
               className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white focus:border-[var(--accent)]/50 outline-none transition-colors"
               min={1}
               max={365}
+              step={1}
             />
           </label>
         </div>
@@ -340,7 +348,10 @@ export default function BuyPage() {
               <input
                 type="number"
                 value={threshold}
-                onChange={(e) => setThreshold(Number(e.target.value))}
+                onChange={(e) => {
+                  const v = Math.floor(Number(e.target.value));
+                  if (isFinite(v) && v > 0) setThreshold(v);
+                }}
                 className="flex-1 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white focus:border-[var(--accent)]/50 outline-none transition-colors"
               />
               <span className="text-sm text-[var(--accent)] font-mono whitespace-nowrap">

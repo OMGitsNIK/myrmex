@@ -2,10 +2,10 @@
 nixPkgs = ["nodejs_20", "npm-9_x", "python3", "gcc", "gnumake"]
 
 [phases.install]
-cmds = ["npm install --omit=dev"]
+cmds = ["npm install"]
 
 [phases.build]
-cmds = []
+cmds = ["npm run build"]
 
 [start]
 cmd = "node dist/index.js"

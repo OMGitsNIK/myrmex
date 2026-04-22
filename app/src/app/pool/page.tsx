@@ -151,7 +151,8 @@ export default function PoolPage() {
   const handleDeposit = async (poolPubkey: string) => {
     if (!program || !wallet) return;
     const amount = Number(depositAmounts[poolPubkey]);
-    if (!amount || amount <= 0) { toast.error("Enter a valid deposit amount"); return; }
+    if (!isFinite(amount) || amount <= 0) { toast.error("Enter a valid deposit amount"); return; }
+    if (amount > 1_000_000) { toast.error("Deposit exceeds maximum (1,000,000 USDC)"); return; }
     setSubmitting(poolPubkey);
     try {
       const poolPk = new PublicKey(poolPubkey);
@@ -191,7 +192,9 @@ export default function PoolPage() {
   const handleWithdraw = async (poolPubkey: string) => {
     if (!program || !wallet) return;
     const amount = Number(withdrawAmounts[poolPubkey]);
-    if (!amount || amount <= 0) { toast.error("Enter a valid LP token amount"); return; }
+    if (!isFinite(amount) || amount <= 0) { toast.error("Enter a valid LP token amount"); return; }
+    const maxLp = lpBalances[poolPubkey] ?? 0;
+    if (maxLp > 0 && amount > maxLp) { toast.error(`Insufficient LP balance (max ${maxLp.toFixed(4)})`); return; }
     setWithdrawing(poolPubkey);
     try {
       const poolPk = new PublicKey(poolPubkey);
@@ -274,11 +277,11 @@ export default function PoolPage() {
               <div className="mt-4 pt-4 border-t border-[var(--border)] grid grid-cols-3 gap-4 text-sm">
                 {s.kind === "deposit" ? <>
                   <div><div className="text-gray-500 text-xs">Deposited</div><div className="text-white font-medium">${s.amount} USDC</div></div>
-                  <div><div className="text-gray-500 text-xs">LP Tokens Minted</div><div className="text-[var(--accent)] font-medium font-mono">~{s.amount} MYR-LP</div></div>
+                  <div><div className="text-gray-500 text-xs">LP Tokens Minted</div><div className="text-[var(--accent)] font-medium font-mono">Check wallet</div></div>
                   <div><div className="text-gray-500 text-xs">Status</div><div className="text-[var(--accent)] font-medium">Earning Premiums</div></div>
                 </> : <>
                   <div><div className="text-gray-500 text-xs">LP Burned</div><div className="text-white font-medium">{s.amount} MYR-LP</div></div>
-                  <div><div className="text-gray-500 text-xs">USDC Returned</div><div className="text-blue-400 font-medium font-mono">~${s.amount}</div></div>
+                  <div><div className="text-gray-500 text-xs">USDC Returned</div><div className="text-blue-400 font-medium font-mono">Check wallet</div></div>
                   <div><div className="text-gray-500 text-xs">Status</div><div className="text-blue-400 font-medium">Position Exited</div></div>
                 </>}
               </div>

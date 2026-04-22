@@ -32,12 +32,19 @@ export function usePolicies() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!wallet) return;
+    if (!wallet) {
+      setPolicies([]);
+      return;
+    }
     setLoading(true);
     fetch(`${API_URL}/api/policies/${wallet.publicKey.toBase58()}`)
-      .then((r) => r.json())
-      .then((data) => {
-        setPolicies(data);
+      .then((r) => {
+        if (!r.ok) throw new Error(`API error ${r.status}`);
+        return r.json();
+      })
+      .then((data: unknown) => {
+        if (!Array.isArray(data)) throw new Error("Unexpected API response shape");
+        setPolicies(data as PolicyData[]);
         setError(null);
       })
       .catch((e) => setError(e.message))

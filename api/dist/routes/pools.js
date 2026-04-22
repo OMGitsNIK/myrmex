@@ -16,11 +16,23 @@ const V2_POOL_NAMES = {
     5: "Bridge-Hack",
 };
 const PROGRAM_ID = new web3_js_1.PublicKey(process.env.PROGRAM_ID || "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan");
+// Canonical pool addresses — only these appear in /api/pools.
+// Populated from env vars (POOL_TYPE_0 … POOL_TYPE_5) with devnet defaults.
+const CANONICAL_POOLS = new Set([
+    process.env.POOL_TYPE_0 || "EHxPZAMvRhumjFeChfeD9bn2Ju1RWf7RM45pY5vzEhNH",
+    process.env.POOL_TYPE_1 || "HfyGsQVVsxt6BNM7UzTepBo91DKYdqLy7RKuLrwnM1YY",
+    process.env.POOL_TYPE_2 || "HuPG3dmBftRCAwg71tro7pmp2hjoCT8KWaNtytwUqUo2",
+    process.env.POOL_TYPE_3 || "ZZWgmeRUSdQyuarSb2zPFron2x88UgexhTQn8hJr9uD",
+    process.env.POOL_TYPE_4 || "CcGbU74HpT8sjDU5NDDWFzBPYEARBEfAac4ovDWwgxWU",
+    process.env.POOL_TYPE_5 || "AqKUYemw3A6GbYFnCFwE9S1f1QCfhH4EAjFQCDxyfUtQ",
+]);
 // GET /api/pools
 router.get("/", async (_req, res) => {
     try {
         const { program } = (0, anchor_service_1.getAnchorProgram)();
-        const pools = await program.account.riskPool.all();
+        const allPools = await program.account.riskPool.all();
+        // Filter to canonical addresses to prevent spoof pools from appearing
+        const pools = allPools.filter(({ publicKey }) => CANONICAL_POOLS.has(publicKey.toBase58()));
         const result = await Promise.all(pools.map(async ({ publicKey, account }) => {
             const acc = account;
             const totalLiquidity = acc.totalLiquidity.toNumber();

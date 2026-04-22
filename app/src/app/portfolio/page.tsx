@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePolicies, PolicyData } from "@/hooks/usePolicies";
 import { useAnchorWallet } from "@solana/wallet-adapter-react";
-import { COVERAGE_NAMES, COMPARISON_LABELS, USDC_DECIMALS } from "@/lib/constants";
+import { COVERAGE_NAMES, COVERAGE_TYPES, USDC_DECIMALS } from "@/lib/constants";
 
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
@@ -73,7 +73,12 @@ function PolicyCard({ p }: { p: PolicyData }) {
         </div>
         <div>
           <div className="text-gray-500 text-xs mb-1">Trigger</div>
-          <div className="text-white font-mono text-xs">value {compLabel} {tc.threshold}</div>
+          <div className="text-white font-mono text-xs">
+            {(() => {
+              const ct = COVERAGE_TYPES.find((t) => t.id === acc.coverageType);
+              return ct ? ct.thresholdDisplay(tc.threshold) : `value ${tc.threshold}`;
+            })()}
+          </div>
         </div>
         <div>
           <div className="text-gray-500 text-xs mb-1">Expires</div>
@@ -92,6 +97,43 @@ function PolicyCard({ p }: { p: PolicyData }) {
           >
             Simulate Trigger →
           </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CollapsibleCategory({ type, policies }: { type: number; policies: PolicyData[] }) {
+  const [open, setOpen] = useState(true);
+  const activeCount = policies.filter(
+    (p) => p.account.isActive && !p.account.isClaimed && new Date(p.account.expiresAt * 1000) > new Date()
+  ).length;
+  return (
+    <div className="space-y-2">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between gap-3 text-left group"
+      >
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold text-white group-hover:text-[var(--accent)] transition-colors">
+            {COVERAGE_NAMES[type] || `Type ${type}`}
+          </h2>
+          <span className="text-xs text-gray-500 bg-[var(--surface-2)] px-2 py-0.5 rounded-full">
+            {policies.length} {policies.length === 1 ? "policy" : "policies"}
+          </span>
+          {activeCount > 0 && (
+            <span className="text-xs bg-[var(--accent-dim)] text-[var(--accent)] px-2 py-0.5 rounded-full">
+              {activeCount} active
+            </span>
+          )}
+        </div>
+        <span className="text-gray-500 text-xs">{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div className="space-y-3">
+          {policies.map((p) => (
+            <PolicyCard key={p.pubkey} p={p} />
+          ))}
         </div>
       )}
     </div>
@@ -187,21 +229,7 @@ export default function PortfolioPage() {
       )}
 
       {sortedTypes.map((type) => (
-        <div key={type} className="space-y-3">
-          <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold text-white">
-              {COVERAGE_NAMES[type] || `Type ${type}`}
-            </h2>
-            <span className="text-xs text-gray-500 bg-[var(--surface-2)] px-2 py-0.5 rounded-full">
-              {grouped[type].length} {grouped[type].length === 1 ? "policy" : "policies"}
-            </span>
-          </div>
-          <div className="space-y-3">
-            {grouped[type].map((p) => (
-              <PolicyCard key={p.pubkey} p={p} />
-            ))}
-          </div>
-        </div>
+        <CollapsibleCategory key={type} type={type} policies={grouped[type]} />
       ))}
 
       {!loading && policies.length > 0 && (
