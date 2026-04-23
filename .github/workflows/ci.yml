@@ -63,13 +63,12 @@ jobs:
             ~/.cargo/bin/avm
             ~/.cargo/bin/anchor
             ~/.avm
-          key: ${{ runner.os }}-avm-0.32.1-solana-1.18.26
+          key: ${{ runner.os }}-avm-0.32.1-solana-2.2.21
 
-      - name: Install Solana CLI 1.18.26
+      - name: Install Solana CLI 2.2.21
         run: |
-          wget -q https://github.com/solana-labs/solana/releases/download/v1.18.26/solana-release-x86_64-unknown-linux-gnu.tar.bz2
-          tar jxf solana-release-x86_64-unknown-linux-gnu.tar.bz2 -C $HOME
-          echo "$HOME/solana-release/bin" >> $GITHUB_PATH
+          sh -c "$(curl -sSfL https://release.anza.xyz/v2.2.21/install)"
+          echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
       - name: Install system deps for AVM build
         run: |
