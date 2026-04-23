@@ -44,14 +44,17 @@ let _program = null;
 let _provider = null;
 function getAnchorProgram() {
     if (_program && _provider)
-        return { program: _program, provider: _provider };
+        return { program: _program, provider: _provider, connection: _provider.connection };
     const connection = new web3_js_1.Connection(RPC_URL, "confirmed");
     let keypair;
     if (process.env.SERVER_KEYPAIR) {
         keypair = web3_js_1.Keypair.fromSecretKey(Buffer.from(JSON.parse(process.env.SERVER_KEYPAIR)));
     }
     else {
-        // Fall back to local default keypair
+        if (process.env.NODE_ENV === "production") {
+            throw new Error("SERVER_KEYPAIR env var is required in production");
+        }
+        console.warn("[anchor.service] SERVER_KEYPAIR not set — falling back to ~/.config/solana/id.json (dev only)");
         const keyPath = path.join(process.env.HOME || "~", ".config/solana/id.json");
         keypair = web3_js_1.Keypair.fromSecretKey(Buffer.from(JSON.parse(fs.readFileSync(keyPath, "utf-8"))));
     }
@@ -67,6 +70,7 @@ function getAnchorProgram() {
     return {
         program: _program,
         provider: _provider,
+        connection,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         accounts: _program.account,
     };

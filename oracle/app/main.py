@@ -8,9 +8,10 @@ FastAPI app that:
 import logging
 import asyncio
 import hashlib
+import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Depends
 from pydantic import BaseModel
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
@@ -37,6 +38,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="MYRMEX Oracle AI Service", lifespan=lifespan)
 
+_ORACLE_API_SECRET = os.environ.get("ORACLE_API_SECRET", "")
+
+
+def require_secret(x_oracle_secret: str = Header(default="")) -> None:
+    """Block write endpoints unless X-Oracle-Secret matches ORACLE_API_SECRET env var."""
+    if _ORACLE_API_SECRET and x_oracle_secret != _ORACLE_API_SECRET:
+        raise HTTPException(status_code=401, detail="Unauthorized: invalid X-Oracle-Secret")
+
 
 # ── Health ──────────────────────────────────────────────────────────────────
 
@@ -55,7 +64,7 @@ class ManualReportRequest(BaseModel):
 
 
 @app.post("/oracle/post-report")
-async def post_report_manual(req: ManualReportRequest):
+async def post_report_manual(req: ManualReportRequest, _: None = Depends(require_secret)):
     """Directly post an oracle report to the given pool (admin/demo use)."""
     try:
         sig = await chain.post_oracle_report(
@@ -70,21 +79,21 @@ async def post_report_manual(req: ManualReportRequest):
 
 
 @app.post("/oracle/run/crop")
-async def trigger_crop():
+async def trigger_crop(_: None = Depends(require_secret)):
     """Manually trigger crop drought oracle job."""
     await run_crop_drought_job()
     return {"triggered": "crop"}
 
 
 @app.post("/oracle/run/defi")
-async def trigger_defi():
+async def trigger_defi(_: None = Depends(require_secret)):
     """Manually trigger DeFi hack oracle job."""
     await run_defi_hack_job()
     return {"triggered": "defi"}
 
 
 @app.post("/oracle/run/flight")
-async def trigger_flight():
+async def trigger_flight(_: None = Depends(require_secret)):
     """Manually trigger flight delay oracle job."""
     await run_flight_job()
     return {"triggered": "flight"}

@@ -500,8 +500,244 @@ describe("myrmex", () => {
     }
   });
 
-  // ── Test 8: LP withdrawal success ────────────────────────────────────────────
-  it("8. LP can withdraw after liquidity freed", async () => {
+  // ── Test 8: Post-event purchase rejected ─────────────────────────────────────
+  it("8. trigger_payout rejects policy created after oracle report", async () => {
+    // Post an oracle report first
+    const preReportScopeHash = Array(32).fill(8);
+    const [preReportPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("oracle_report"), poolPda.toBuffer(), Buffer.from(preReportScopeHash)],
+      program.programId
+    );
+    await program.methods
+      .postOracleReport(new BN(200), preReportScopeHash, Array(192).fill(0))
+      .accounts({
+        oracleAuthority: oracleKp.publicKey,
+        pool: poolPda,
+        poolConfig: poolConfigPda,
+        oracleReport: preReportPda,
+      })
+      .signers([oracleKp])
+      .rpc();
+
+    // Small delay to ensure policy.created_at > oracle_report.reported_at
+    await new Promise((r) => setTimeout(r, 1500));
+
+    // Now create a policy AFTER the oracle report — trigger should be rejected
+    const postEventNonce = new BN(Math.floor(Date.now() / 1000) + 111111);
+    const [postEventPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("policy"),
+        policyholderKp.publicKey.toBuffer(),
+        poolPda.toBuffer(),
+        Buffer.from(postEventNonce.toArray("le", 8)),
+      ],
+      program.programId
+    );
+    const triggerCondition = {
+      oraclePubkey: oracleKp.publicKey,
+      scopeHash: preReportScopeHash,
+      threshold: new BN(120),
+      comparison: 0,
+    };
+    await program.methods
+      .createPolicy(
+        0,
+        new BN(5_000_000),
+        new BN(500_000),
+        triggerCondition,
+        new BN(Math.floor(Date.now() / 1000) + 86400),
+        postEventNonce
+      )
+      .accounts({
+        policyholder: policyholderKp.publicKey,
+        policy: postEventPda,
+        pool: poolPda,
+        poolConfig: poolConfigPda,
+        policyholderUsdc: policyholderUsdcAta,
+        poolVault,
+        usdcMint,
+      })
+      .signers([policyholderKp])
+      .rpc();
+
+    try {
+      await program.methods
+        .triggerPayout()
+        .accounts({
+          caller: provider.wallet.publicKey,
+          policy: postEventPda,
+          pool: poolPda,
+          poolConfig: poolConfigPda,
+          oracleReport: preReportPda,
+          policyholderUsdc: policyholderUsdcAta,
+          poolVault,
+          policyholder: policyholderKp.publicKey,
+        })
+        .rpc();
+      assert.fail("Should have rejected post-event purchase");
+    } catch (err: any) {
+      assert.include(
+        err.message,
+        "PostEventPurchase",
+        "Should fail with PostEventPurchase"
+      );
+      console.log("  Post-event purchase correctly rejected");
+    }
+  });
+
+  // ── Test 9: Expired policy cannot trigger payout ──────────────────────────────
+  it("9. trigger_payout rejects already-expired policy", async () => {
+    const expiredNonce = new BN(Math.floor(Date.now() / 1000) + 222222);
+    const [expiredClaimPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("policy"),
+        policyholderKp.publicKey.toBuffer(),
+        poolPda.toBuffer(),
+        Buffer.from(expiredNonce.toArray("le", 8)),
+      ],
+      program.programId
+    );
+    const triggerCondition = {
+      oraclePubkey: oracleKp.publicKey,
+      scopeHash: SCOPE_HASH,
+      threshold: new BN(120),
+      comparison: 0,
+    };
+    // Create policy that expires in 1 second
+    await program.methods
+      .createPolicy(
+        0,
+        new BN(5_000_000),
+        new BN(500_000),
+        triggerCondition,
+        new BN(Math.floor(Date.now() / 1000) + 1),
+        expiredNonce
+      )
+      .accounts({
+        policyholder: policyholderKp.publicKey,
+        policy: expiredClaimPda,
+        pool: poolPda,
+        poolConfig: poolConfigPda,
+        policyholderUsdc: policyholderUsdcAta,
+        poolVault,
+        usdcMint,
+      })
+      .signers([policyholderKp])
+      .rpc();
+
+    // Wait for policy to expire
+    await new Promise((r) => setTimeout(r, 2000));
+
+    try {
+      await program.methods
+        .triggerPayout()
+        .accounts({
+          caller: provider.wallet.publicKey,
+          policy: expiredClaimPda,
+          pool: poolPda,
+          poolConfig: poolConfigPda,
+          oracleReport: oracleReportPda,
+          policyholderUsdc: policyholderUsdcAta,
+          poolVault,
+          policyholder: policyholderKp.publicKey,
+        })
+        .rpc();
+      assert.fail("Should have rejected expired policy");
+    } catch (err: any) {
+      assert.include(
+        err.message,
+        "PolicyExpired",
+        "Should fail with PolicyExpired"
+      );
+      console.log("  Expired policy payout correctly rejected");
+    }
+  });
+
+  // ── Test 10: Wrong scope hash rejected ────────────────────────────────────────
+  it("10. trigger_payout rejects mismatched scope hash", async () => {
+    const wrongScopeHash = Array(32).fill(99);
+    const [wrongScopePda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("oracle_report"), poolPda.toBuffer(), Buffer.from(wrongScopeHash)],
+      program.programId
+    );
+    await program.methods
+      .postOracleReport(new BN(200), wrongScopeHash, Array(192).fill(0))
+      .accounts({
+        oracleAuthority: oracleKp.publicKey,
+        pool: poolPda,
+        poolConfig: poolConfigPda,
+        oracleReport: wrongScopePda,
+      })
+      .signers([oracleKp])
+      .rpc();
+
+    // Create a policy with SCOPE_HASH (different from wrongScopeHash)
+    const wrongScopeNonce = new BN(Math.floor(Date.now() / 1000) + 333333);
+    const [wrongScopePolicyPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("policy"),
+        policyholderKp.publicKey.toBuffer(),
+        poolPda.toBuffer(),
+        Buffer.from(wrongScopeNonce.toArray("le", 8)),
+      ],
+      program.programId
+    );
+    const triggerCondition = {
+      oraclePubkey: oracleKp.publicKey,
+      scopeHash: SCOPE_HASH,
+      threshold: new BN(120),
+      comparison: 0,
+    };
+    await program.methods
+      .createPolicy(
+        0,
+        new BN(5_000_000),
+        new BN(500_000),
+        triggerCondition,
+        new BN(Math.floor(Date.now() / 1000) + 86400),
+        wrongScopeNonce
+      )
+      .accounts({
+        policyholder: policyholderKp.publicKey,
+        policy: wrongScopePolicyPda,
+        pool: poolPda,
+        poolConfig: poolConfigPda,
+        policyholderUsdc: policyholderUsdcAta,
+        poolVault,
+        usdcMint,
+      })
+      .signers([policyholderKp])
+      .rpc();
+
+    // Attempting to trigger with wrongScopePda (scope mismatch) should fail at account
+    // resolution — the PDA derivation uses policy.trigger_condition.scope_hash so
+    // passing a mismatched oracle report PDA will be caught by the seeds constraint.
+    try {
+      await program.methods
+        .triggerPayout()
+        .accounts({
+          caller: provider.wallet.publicKey,
+          policy: wrongScopePolicyPda,
+          pool: poolPda,
+          poolConfig: poolConfigPda,
+          oracleReport: wrongScopePda, // wrong scope
+          policyholderUsdc: policyholderUsdcAta,
+          poolVault,
+          policyholder: policyholderKp.publicKey,
+        })
+        .rpc();
+      assert.fail("Should have rejected scope hash mismatch");
+    } catch (err: any) {
+      const blocked =
+        err.message.includes("OracleScopeMismatch") ||
+        err.message.includes("seeds constraint") ||
+        err.message.includes("ConstraintSeeds");
+      assert.isTrue(blocked, `Should fail on scope mismatch, got: ${err.message}`);
+      console.log("  Scope hash mismatch correctly rejected");
+    }
+  });
+
+  it("11. LP can withdraw after liquidity freed", async () => {
     // Check available liquidity
     const pool = await program.account.riskPool.fetch(poolPda);
     const available =

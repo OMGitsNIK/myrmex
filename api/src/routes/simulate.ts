@@ -35,7 +35,11 @@ function loadOracleKeypair(): Keypair {
       Buffer.from(JSON.parse(fs.readFileSync(keyPath, "utf-8")))
     );
   }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("ORACLE_KEYPAIR_JSON env var is required in production");
+  }
   // Fall back to main server keypair (dev only)
+  console.warn("[simulate] ORACLE_KEYPAIR_JSON not set — falling back to ~/.config/solana/id.json (dev only)");
   const fallbackPath = path.join(process.env.HOME || "~", ".config/solana/id.json");
   return Keypair.fromSecretKey(
     Buffer.from(JSON.parse(fs.readFileSync(fallbackPath, "utf-8")))

@@ -111,8 +111,7 @@ export default function GovernancePage() {
     } catch (e: unknown) {
       const err = e as Error;
       if (err.message?.includes("Account does not exist") || err.message?.includes("not found")) {
-        setVotes((prev) => ({ ...prev, [proposalId]: side }));
-        toast.success(`Vote recorded (governance demo mode)`);
+        toast.error("Vote failed: stake account not found. Stake MYR first to participate in governance.");
       } else {
         toast.error("Vote failed", { description: err.message });
       }

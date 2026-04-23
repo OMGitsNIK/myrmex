@@ -35,5 +35,9 @@ app.listen(PORT, () => {
   console.log(`MYRMEX API running on port ${PORT}`);
   startIndexer();
   startCron();
-  startOracleCron();
+  if (process.env.ENABLE_ORACLE_CRON === "true") {
+    startOracleCron();
+  } else {
+    console.log("Oracle cron disabled (set ENABLE_ORACLE_CRON=true to enable)");
+  }
 });

@@ -21,7 +21,10 @@ export function getAnchorProgram() {
       Buffer.from(JSON.parse(process.env.SERVER_KEYPAIR))
     );
   } else {
-    // Fall back to local default keypair
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("SERVER_KEYPAIR env var is required in production");
+    }
+    console.warn("[anchor.service] SERVER_KEYPAIR not set — falling back to ~/.config/solana/id.json (dev only)");
     const keyPath = path.join(
       process.env.HOME || "~",
       ".config/solana/id.json"
