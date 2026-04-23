@@ -355,41 +355,70 @@ async function runEarthquakeJob() {
     const { magnitude, place, sources } = await fetchEarthquake();
     const onChainValue = Math.round(magnitude * 100); // M6.5 → 650
     const { approved, reasoning } = await groqValidate(`Earthquake oracle: ${sources}. Is the top magnitude M${magnitude.toFixed(1)} at "${place}" a plausible real-world reading and do both data sources agree?`);
+    if (!approved) {
+        console.warn(`[oracle:earthquake] BLOCKED by AI validator: ${reasoning}`);
+        return;
+    }
     const tx = await postReport(new web3_js_1.PublicKey(EARTHQUAKE_POOL), onChainValue, scopeHash(SCOPE_SEEDS.earthquake), `EQ M${magnitude.toFixed(1)} ${place.slice(0, 40)} | ${reasoning}`);
-    console.log(`[oracle:earthquake] M${magnitude.toFixed(1)} value=${onChainValue} approved=${approved} tx=${tx.slice(0, 16)}…`);
+    console.log(`[oracle:earthquake] M${magnitude.toFixed(1)} value=${onChainValue} tx=${tx.slice(0, 16)}…`);
 }
 async function runFloodJob() {
     const { gaugeFt, siteName, sources } = await fetchFlood();
     const onChainValue = Math.round(gaugeFt * 10); // 28.3ft → 283
     const { approved, reasoning } = await groqValidate(`Flood oracle: ${sources}. Is gauge height ${gaugeFt.toFixed(1)} ft at "${siteName}" plausible?`);
+    if (!approved) {
+        console.warn(`[oracle:flood] BLOCKED by AI validator: ${reasoning}`);
+        return;
+    }
     const tx = await postReport(new web3_js_1.PublicKey(FLOOD_POOL), onChainValue, scopeHash(SCOPE_SEEDS.flood), `Flood ${gaugeFt.toFixed(1)}ft ${siteName.slice(0, 30)} | ${reasoning}`);
-    console.log(`[oracle:flood] ${gaugeFt.toFixed(1)}ft value=${onChainValue} approved=${approved} tx=${tx.slice(0, 16)}…`);
+    console.log(`[oracle:flood] ${gaugeFt.toFixed(1)}ft value=${onChainValue} tx=${tx.slice(0, 16)}…`);
 }
 async function runCropJob() {
     const { score, sources } = await fetchCropComposite();
     const { approved, reasoning } = await groqValidate(`Crop multi-factor oracle: ${sources}. Is this composite crop stress score plausible?`);
+    if (!approved) {
+        console.warn(`[oracle:crop] BLOCKED by AI validator: ${reasoning}`);
+        return;
+    }
     const tx = await postReport(new web3_js_1.PublicKey(CROP_POOL), score, scopeHash(SCOPE_SEEDS.crop), `Crop score ${score}/10000 | ${reasoning}`);
-    console.log(`[oracle:crop] score=${score}/10000 approved=${approved} tx=${tx.slice(0, 16)}…`);
+    console.log(`[oracle:crop] score=${score}/10000 tx=${tx.slice(0, 16)}…`);
 }
 async function runHurricaneJob() {
     const { windKnots, name, sources } = await fetchHurricane();
     const { approved, reasoning } = await groqValidate(`Hurricane oracle: ${sources}. Is this tropical weather reading plausible?`);
+    if (!approved) {
+        console.warn(`[oracle:hurricane] BLOCKED by AI validator: ${reasoning}`);
+        return;
+    }
     const tx = await postReport(new web3_js_1.PublicKey(HURRICANE_POOL), windKnots, scopeHash(SCOPE_SEEDS.hurricane), `${name} ${windKnots}kt | ${reasoning}`);
-    console.log(`[oracle:hurricane] ${name} ${windKnots}kt approved=${approved} tx=${tx.slice(0, 16)}…`);
+    console.log(`[oracle:hurricane] ${name} ${windKnots}kt tx=${tx.slice(0, 16)}…`);
 }
 async function runStablecoinJob() {
     const { usdcBps, usdtBps, sources } = await fetchStablecoinPrice();
     // Report the lower of USDC/USDT (worst-case depeg)
     const onChainValue = Math.min(usdcBps, usdtBps);
     const { approved, reasoning } = await groqValidate(`Stablecoin oracle: ${sources}. Are these stablecoin prices plausible?`);
+    if (!approved) {
+        console.warn(`[oracle:stablecoin] BLOCKED by AI validator: ${reasoning}`);
+        return;
+    }
     const tx = await postReport(new web3_js_1.PublicKey(USDC_POOL), onChainValue, scopeHash(SCOPE_SEEDS.stablecoin), `USDC ${(usdcBps / 100).toFixed(2)}¢ USDT ${(usdtBps / 100).toFixed(2)}¢ | ${reasoning}`);
-    console.log(`[oracle:stablecoin] USDC=${usdcBps}bps USDT=${usdtBps}bps approved=${approved} tx=${tx.slice(0, 16)}…`);
+    console.log(`[oracle:stablecoin] USDC=${usdcBps}bps USDT=${usdtBps}bps tx=${tx.slice(0, 16)}…`);
 }
 async function runBridgeJob() {
     const { tvlMillions, sources } = await fetchBridgeTvl();
+    // Skip posting if all fetches failed — zero TVL on outage would false-trigger policies
+    if (tvlMillions === 0) {
+        console.warn("[oracle:bridge] SKIPPED: tvlMillions=0 (all DeFiLlama fetches failed — data outage guard)");
+        return;
+    }
     const { approved, reasoning } = await groqValidate(`Bridge TVL oracle: ${sources}. Is the combined bridge TVL plausible (no active mass exploit)?`);
+    if (!approved) {
+        console.warn(`[oracle:bridge] BLOCKED by AI validator: ${reasoning}`);
+        return;
+    }
     const tx = await postReport(new web3_js_1.PublicKey(BRIDGE_POOL), tvlMillions, scopeHash(SCOPE_SEEDS.bridge), `Bridges $${(tvlMillions / 1000).toFixed(1)}B | ${reasoning}`);
-    console.log(`[oracle:bridge] tvl=$${(tvlMillions / 1000).toFixed(1)}B value=${tvlMillions}M approved=${approved} tx=${tx.slice(0, 16)}…`);
+    console.log(`[oracle:bridge] tvl=$${(tvlMillions / 1000).toFixed(1)}B value=${tvlMillions}M tx=${tx.slice(0, 16)}…`);
 }
 // ── Scheduler ─────────────────────────────────────────────────────────────
 async function runAllJobs() {

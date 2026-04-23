@@ -66,9 +66,10 @@ router.post("/", async (req, res) => {
     return res.status(403).json({ error: "simulate-trigger is disabled in production" });
   }
   try {
-    const { policy: policyPubkeyStr, oracle_value } = req.body as {
+    const { policy: policyPubkeyStr, oracle_value, policyholder: callerStr } = req.body as {
       policy: string;
       oracle_value: number;
+      policyholder?: string;
     };
 
     const { program, provider } = getAnchorProgram();
@@ -76,6 +77,14 @@ router.post("/", async (req, res) => {
     const policyAccount = (await (program as any).account.policyVault.fetch(
       policyPk
     )) as any;
+
+    // Require caller to identify themselves as the policyholder
+    const onChainPolicyholder = (policyAccount.policyholder as PublicKey).toBase58();
+    if (!callerStr || callerStr !== onChainPolicyholder) {
+      return res.status(403).json({
+        error: "Only the policyholder can simulate a trigger for this policy",
+      });
+    }
 
     const poolPk = policyAccount.pool as PublicKey;
     const poolAccount = (await (program as any).account.riskPool.fetch(

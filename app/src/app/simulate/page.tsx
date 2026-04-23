@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { useAnchorWallet } from "@solana/wallet-adapter-react";
 import { API_URL, explorerUrl, COVERAGE_NAMES, COMPARISON_LABELS, USDC_DECIMALS } from "@/lib/constants";
 import { toast } from "sonner";
 
@@ -30,6 +31,7 @@ function validOracleValue(comparison: number, threshold: number): number {
 function SimulateInner() {
   const searchParams = useSearchParams();
   const prefillPolicy = searchParams.get("policy") ?? "";
+  const wallet = useAnchorWallet();
 
   const [policyPubkey, setPolicyPubkey] = useState(prefillPolicy);
   const [oracleValue, setOracleValue] = useState(150);
@@ -73,6 +75,7 @@ function SimulateInner() {
 
   const simulate = async () => {
     if (!policyPubkey) { toast.error("Enter a policy pubkey"); return; }
+    if (!wallet) { toast.error("Connect your wallet to simulate a trigger"); return; }
     setRunning(true);
     setTotalMs(null);
     const start = Date.now();
@@ -93,7 +96,7 @@ function SimulateInner() {
       const res = await fetch(`${API_URL}/api/simulate-trigger`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ policy: policyPubkey, oracle_value: oracleValue }),
+        body: JSON.stringify({ policy: policyPubkey, oracle_value: oracleValue, policyholder: wallet.publicKey.toBase58() }),
       });
 
       if (!res.ok) {
@@ -231,11 +234,13 @@ function SimulateInner() {
 
         <button
           onClick={simulate}
-          disabled={running || (policyInfo?.isClaimed ?? false) || !policyPubkey}
+          disabled={running || (policyInfo?.isClaimed ?? false) || !policyPubkey || !wallet}
           className="w-full bg-[var(--accent)] hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-black font-bold py-3 rounded-lg transition-opacity text-sm tracking-wide"
         >
           {running
             ? "Simulating on-chain…"
+            : !wallet
+            ? "Connect Wallet to Simulate"
             : policyInfo
             ? `Simulate ${COVERAGE_NAMES[policyInfo.coverageType] ?? "Policy"} Trigger`
             : "Simulate Trigger"}
