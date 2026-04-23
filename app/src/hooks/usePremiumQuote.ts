@@ -27,12 +27,12 @@ export interface Quote {
 function localFallbackQuote(params: QuoteRequest): Quote {
   // Rates are floored at 5% (500 bps) to match on-chain minPremiumBps
   const base: Record<string, number> = {
-    earthquake:        0.055,
-    flood:             0.060,
-    crop_multifactor:  0.075,
-    hurricane:         0.080,
-    stablecoin_depeg:  0.050,
-    bridge_hack:       0.065,
+    earthquake: 0.055,
+    flood: 0.06,
+    crop_multifactor: 0.075,
+    hurricane: 0.08,
+    stablecoin_depeg: 0.05,
+    bridge_hack: 0.065,
   };
   const rate = base[params.coverage_type] ?? 0.03;
   const durationFactor = Math.min(params.duration_days / 30, 3);

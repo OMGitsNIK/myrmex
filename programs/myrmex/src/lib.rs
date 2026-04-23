@@ -30,7 +30,12 @@ pub mod myrmex {
         min_premium_bps: u64,
         max_coverage_bps: u64,
     ) -> Result<()> {
-        instructions::initialize_pool_config::handler(ctx, oracle_authority, min_premium_bps, max_coverage_bps)
+        instructions::initialize_pool_config::handler(
+            ctx,
+            oracle_authority,
+            min_premium_bps,
+            max_coverage_bps,
+        )
     }
 
     pub fn post_oracle_report(
@@ -84,7 +89,12 @@ pub mod myrmex {
         min_premium_bps: u64,
         max_coverage_bps: u64,
     ) -> Result<()> {
-        instructions::update_pool_config::handler(ctx, oracle_authority, min_premium_bps, max_coverage_bps)
+        instructions::update_pool_config::handler(
+            ctx,
+            oracle_authority,
+            min_premium_bps,
+            max_coverage_bps,
+        )
     }
 
     pub fn stake_myr(ctx: Context<StakeMyr>, amount: u64) -> Result<()> {

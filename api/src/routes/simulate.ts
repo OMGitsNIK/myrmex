@@ -36,7 +36,10 @@ function loadOracleKeypair(): Keypair {
     );
   }
   // Fall back to main server keypair (dev only)
-  const fallbackPath = path.join(process.env.HOME || "~", ".config/solana/id.json");
+  const fallbackPath = path.join(
+    process.env.HOME || "~",
+    ".config/solana/id.json"
+  );
   return Keypair.fromSecretKey(
     Buffer.from(JSON.parse(fs.readFileSync(fallbackPath, "utf-8")))
   );
@@ -59,7 +62,9 @@ function getOracleProgram() {
 // Dev/demo only — disabled in production unless ALLOW_SIMULATE=true is explicitly set.
 router.post("/", async (req, res) => {
   if (process.env.ALLOW_SIMULATE !== "true") {
-    return res.status(403).json({ error: "simulate-trigger is disabled in production" });
+    return res
+      .status(403)
+      .json({ error: "simulate-trigger is disabled in production" });
   }
   try {
     const { policy: policyPubkeyStr, oracle_value } = req.body as {
@@ -102,9 +107,14 @@ router.post("/", async (req, res) => {
     );
 
     // Step 1: post oracle report — signed by oracle keypair
-    const { program: oracleProgram, provider: oracleProvider } = getOracleProgram();
+    const { program: oracleProgram, provider: oracleProvider } =
+      getOracleProgram();
     await oracleProgram.methods
-      .postOracleReport(new anchor.BN(oracle_value), Array.from(scopeHash), description)
+      .postOracleReport(
+        new anchor.BN(oracle_value),
+        Array.from(scopeHash),
+        description
+      )
       .accounts({
         oracleAuthority: oracleProvider.wallet.publicKey,
         pool: poolPk,

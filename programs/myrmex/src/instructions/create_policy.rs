@@ -98,7 +98,10 @@ pub fn handler(
         .ok_or(error!(MyrmexError::MathOverflow))?
         .checked_div(10_000)
         .ok_or(error!(MyrmexError::MathOverflow))?;
-    require!(premium_amount >= min_premium, MyrmexError::InsufficientPremium);
+    require!(
+        premium_amount >= min_premium,
+        MyrmexError::InsufficientPremium
+    );
 
     // Coverage cap: (locked + new_payout) must not exceed max_coverage_bps% of total_liquidity
     let new_locked = ctx

@@ -75,7 +75,11 @@ describe("myrmex", () => {
       program.programId
     );
     [oracleReportPda] = anchor.web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("oracle_report"), poolPda.toBuffer(), Buffer.from(SCOPE_HASH)],
+      [
+        Buffer.from("oracle_report"),
+        poolPda.toBuffer(),
+        Buffer.from(SCOPE_HASH),
+      ],
       program.programId
     );
 

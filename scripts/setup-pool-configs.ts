@@ -27,8 +27,8 @@ const POOL_CONFIGS = [
   {
     poolType: 0,
     name: "Flight-Global",
-    minPremiumBps: 500,    // 5% of payout
-    maxCoverageBps: 8000,  // 80% of liquidity can be locked
+    minPremiumBps: 500, // 5% of payout
+    maxCoverageBps: 8000, // 80% of liquidity can be locked
   },
   {
     poolType: 1,
@@ -39,7 +39,7 @@ const POOL_CONFIGS = [
   {
     poolType: 3,
     name: "DeFi-Hack",
-    minPremiumBps: 300,    // 3% — DeFi hack coverage is more commoditized
+    minPremiumBps: 300, // 3% — DeFi hack coverage is more commoditized
     maxCoverageBps: 7000,
   },
 ];
@@ -67,7 +67,9 @@ async function main() {
   } else {
     // Fall back to admin as oracle (dev only)
     oracleAuthority = admin.publicKey;
-    console.log("⚠ oracle.json not found, using admin as oracle authority (dev only)");
+    console.log(
+      "⚠ oracle.json not found, using admin as oracle authority (dev only)"
+    );
   }
 
   const connection = new anchor.web3.Connection(
@@ -82,10 +84,7 @@ async function main() {
   anchor.setProvider(provider);
 
   const idl = JSON.parse(
-    fs.readFileSync(
-      path.join(__dirname, "../target/idl/myrmex.json"),
-      "utf-8"
-    )
+    fs.readFileSync(path.join(__dirname, "../target/idl/myrmex.json"), "utf-8")
   );
   const program = new anchor.Program(idl, provider);
 
@@ -128,10 +127,19 @@ async function main() {
       console.log(`\n✓ ${cfg.name}`);
       console.log(`  Pool:       ${poolPda.toBase58()}`);
       console.log(`  PoolConfig: ${poolConfigPda.toBase58()}`);
-      console.log(`  Min premium: ${cfg.minPremiumBps} bps (${cfg.minPremiumBps / 100}%)`);
-      console.log(`  Max coverage: ${cfg.maxCoverageBps} bps (${cfg.maxCoverageBps / 100}%)`);
+      console.log(
+        `  Min premium: ${cfg.minPremiumBps} bps (${cfg.minPremiumBps / 100}%)`
+      );
+      console.log(
+        `  Max coverage: ${cfg.maxCoverageBps} bps (${
+          cfg.maxCoverageBps / 100
+        }%)`
+      );
     } catch (e: any) {
-      if (e.message?.includes("already in use") || e.message?.includes("already initialized")) {
+      if (
+        e.message?.includes("already in use") ||
+        e.message?.includes("already initialized")
+      ) {
         console.log(`\nℹ ${cfg.name} pool_config already exists`);
       } else {
         console.error(`\n✗ ${cfg.name} failed:`, e.message);

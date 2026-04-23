@@ -40,7 +40,9 @@ router.get("/:pool", async (req, res) => {
     let scopeHash = parseScopeHash(req.query.scope_hash as string | undefined);
 
     if (!scopeHash) {
-      const pool = (await (program as any).account.riskPool.fetch(poolPk)) as any;
+      const pool = (await (program as any).account.riskPool.fetch(
+        poolPk
+      )) as any;
       scopeHash = scopeHashFromSeed(
         DEFAULT_SCOPE_SEEDS[pool.poolType] || `pool:${pool.poolType}:default`
       );
@@ -66,7 +68,10 @@ router.get("/:pool", async (req, res) => {
       scope_hash: Buffer.from(report.scopeHash).toString("hex"),
       reported_value: report.reportedValue.toNumber(),
       reported_at: reportedAt,
-      description: Buffer.from(report.description).toString("utf8").replace(/\0/g, "").trim(),
+      description: Buffer.from(report.description)
+        .toString("utf8")
+        .replace(/\0/g, "")
+        .trim(),
       age_secs: age,
       is_fresh: age <= MAX_AGE_SECS,
     });

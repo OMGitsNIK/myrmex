@@ -11,7 +11,12 @@ let _program: anchor.Program | null = null;
 let _provider: anchor.AnchorProvider | null = null;
 
 export function getAnchorProgram() {
-  if (_program && _provider) return { program: _program, provider: _provider, connection: _provider.connection };
+  if (_program && _provider)
+    return {
+      program: _program,
+      provider: _provider,
+      connection: _provider.connection,
+    };
 
   const connection = new Connection(RPC_URL, "confirmed");
 
