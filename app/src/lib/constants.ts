@@ -16,7 +16,9 @@ export const RPC_URL =
 
 export function explorerUrl(tx: string): string {
   if (RPC_URL.includes("localhost") || RPC_URL.includes("127.0.0.1"))
-    return `https://explorer.solana.com/tx/${tx}?cluster=custom&customUrl=${encodeURIComponent(RPC_URL)}`;
+    return `https://explorer.solana.com/tx/${tx}?cluster=custom&customUrl=${encodeURIComponent(
+      RPC_URL
+    )}`;
   if (RPC_URL.includes("devnet"))
     return `https://explorer.solana.com/tx/${tx}?cluster=devnet`;
   return `https://explorer.solana.com/tx/${tx}`;
@@ -24,7 +26,6 @@ export function explorerUrl(tx: string): string {
 
 export const PRICING_API =
   process.env.NEXT_PUBLIC_PRICING_API || "http://localhost:8000";
-
 
 export const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
@@ -64,7 +65,9 @@ export function bytesToHex(bytes: number[]): string {
 export function hexToBytes(hex: string): number[] {
   const clean = hex.startsWith("0x") ? hex.slice(2) : hex;
   if (clean.length !== 64) return new Array(32).fill(0);
-  return Array.from({ length: 32 }, (_, i) => parseInt(clean.slice(i * 2, i * 2 + 2), 16));
+  return Array.from({ length: 32 }, (_, i) =>
+    parseInt(clean.slice(i * 2, i * 2 + 2), 16)
+  );
 }
 
 export async function scopeHashBytes(seed: string): Promise<number[]> {
@@ -78,9 +81,11 @@ export function policyScopeSeed(
   coverageKey: string,
   values: Record<string, string>
 ): string {
-  if (coverageKey === "earthquake") return `earthquake:${values.seismic_region || "Global"}`;
+  if (coverageKey === "earthquake")
+    return `earthquake:${values.seismic_region || "Global"}`;
   if (coverageKey === "flood") return `flood:${values.river || "Mississippi"}`;
-  if (coverageKey === "crop_multifactor") return `crop_multifactor:${values.crop_region || "Iowa"}`;
+  if (coverageKey === "crop_multifactor")
+    return `crop_multifactor:${values.crop_region || "Iowa"}`;
   return DEFAULT_SCOPE_SEEDS[coverageTypeId] || `${coverageKey}:default`;
 }
 
@@ -102,10 +107,15 @@ export const COVERAGE_TYPES = [
     oracleSource: "USGS Earthquake API (real-time)",
     // on-chain trigger: oracle_value (magnitude×100) > threshold
     comparison: 0,
-    defaultThreshold: 650,           // M6.5 × 100
+    defaultThreshold: 650, // M6.5 × 100
     thresholdLabel: "Min magnitude × 100 (e.g. 650 = M6.5)",
     thresholdDisplay: (v: number) => `M${(v / 100).toFixed(1)}+`,
-    pricingParams: (threshold: number, payout: number, days: number, region: string) => ({
+    pricingParams: (
+      threshold: number,
+      payout: number,
+      days: number,
+      region: string
+    ) => ({
       coverage_type: "earthquake",
       payout_amount_usdc: payout,
       duration_days: days,
@@ -113,7 +123,12 @@ export const COVERAGE_TYPES = [
       seismic_region: region,
     }),
     extraFields: [
-      { key: "seismic_region", label: "Region", placeholder: "Pacific Ring, Japan, California…", default: "Global" },
+      {
+        key: "seismic_region",
+        label: "Region",
+        placeholder: "Pacific Ring, Japan, California…",
+        default: "Global",
+      },
     ],
   },
   {
@@ -131,10 +146,15 @@ export const COVERAGE_TYPES = [
     oracleSource: "USGS Water Services (real-time gauges)",
     // oracle_value (gauge_ft×10) > threshold
     comparison: 0,
-    defaultThreshold: 300,           // 30.0 ft flood stage
+    defaultThreshold: 300, // 30.0 ft flood stage
     thresholdLabel: "Gauge height threshold × 10 (e.g. 300 = 30.0 ft)",
     thresholdDisplay: (v: number) => `${(v / 10).toFixed(1)} ft`,
-    pricingParams: (threshold: number, payout: number, days: number, region: string) => ({
+    pricingParams: (
+      threshold: number,
+      payout: number,
+      days: number,
+      region: string
+    ) => ({
       coverage_type: "flood",
       payout_amount_usdc: payout,
       duration_days: days,
@@ -142,7 +162,12 @@ export const COVERAGE_TYPES = [
       river: region,
     }),
     extraFields: [
-      { key: "river", label: "River System", placeholder: "Mississippi, Missouri, Ohio…", default: "Mississippi" },
+      {
+        key: "river",
+        label: "River System",
+        placeholder: "Mississippi, Missouri, Ohio…",
+        default: "Mississippi",
+      },
     ],
   },
   {
@@ -160,10 +185,16 @@ export const COVERAGE_TYPES = [
     oracleSource: "Open-Meteo dual-source (forecast + archive)",
     // oracle_value (score 0–10000) < threshold — low score = bad conditions
     comparison: 1,
-    defaultThreshold: 3000,          // score < 3000 = severe stress
-    thresholdLabel: "Stress threshold 0–10000 (lower = worse; trigger if below)",
+    defaultThreshold: 3000, // score < 3000 = severe stress
+    thresholdLabel:
+      "Stress threshold 0–10000 (lower = worse; trigger if below)",
     thresholdDisplay: (v: number) => `Score < ${v.toLocaleString()}`,
-    pricingParams: (threshold: number, payout: number, days: number, region: string) => ({
+    pricingParams: (
+      threshold: number,
+      payout: number,
+      days: number,
+      region: string
+    ) => ({
       coverage_type: "crop_multifactor",
       payout_amount_usdc: payout,
       duration_days: days,
@@ -171,7 +202,12 @@ export const COVERAGE_TYPES = [
       crop_region: region,
     }),
     extraFields: [
-      { key: "crop_region", label: "Farming Region", placeholder: "Iowa, Maharashtra, Kansas…", default: "Iowa" },
+      {
+        key: "crop_region",
+        label: "Farming Region",
+        placeholder: "Iowa, Maharashtra, Kansas…",
+        default: "Iowa",
+      },
     ],
   },
   {
@@ -189,10 +225,16 @@ export const COVERAGE_TYPES = [
     oracleSource: "NOAA NHC + Weather.gov alerts",
     // oracle_value (wind knots) > threshold
     comparison: 0,
-    defaultThreshold: 64,            // Hurricane force (Category 1)
-    thresholdLabel: "Sustained wind knots (64 = Cat 1, 96 = Cat 3, 137 = Cat 5)",
+    defaultThreshold: 64, // Hurricane force (Category 1)
+    thresholdLabel:
+      "Sustained wind knots (64 = Cat 1, 96 = Cat 3, 137 = Cat 5)",
     thresholdDisplay: (v: number) => `${v} kt sustained`,
-    pricingParams: (threshold: number, payout: number, days: number, _region: string) => ({
+    pricingParams: (
+      threshold: number,
+      payout: number,
+      days: number,
+      _region: string
+    ) => ({
       coverage_type: "hurricane",
       payout_amount_usdc: payout,
       duration_days: days,
@@ -215,10 +257,15 @@ export const COVERAGE_TYPES = [
     oracleSource: "CoinGecko dual-endpoint (price + market data)",
     // oracle_value (price in bps, 10000=$1.00) < threshold
     comparison: 1,
-    defaultThreshold: 9700,          // $0.97 depeg
+    defaultThreshold: 9700, // $0.97 depeg
     thresholdLabel: "Depeg threshold (bps, 10000 = $1.00; e.g. 9700 = $0.97)",
     thresholdDisplay: (v: number) => `$${(v / 10000).toFixed(3)}`,
-    pricingParams: (threshold: number, payout: number, days: number, _region: string) => ({
+    pricingParams: (
+      threshold: number,
+      payout: number,
+      days: number,
+      _region: string
+    ) => ({
       coverage_type: "stablecoin_depeg",
       payout_amount_usdc: payout,
       duration_days: days,
@@ -241,14 +288,20 @@ export const COVERAGE_TYPES = [
     oracleSource: "DeFiLlama TVL + hacks endpoint",
     // oracle_value (TVL in millions) < threshold — drop from baseline
     comparison: 1,
-    defaultThreshold: 1500,          // < $1.5B combined = likely exploit
-    thresholdLabel: "Bridge TVL floor in $M (trigger if total drops below this)",
+    defaultThreshold: 1500, // < $1.5B combined = likely exploit
+    thresholdLabel:
+      "Bridge TVL floor in $M (trigger if total drops below this)",
     thresholdDisplay: (v: number) => `< $${(v / 1000).toFixed(1)}B TVL`,
-    pricingParams: (threshold: number, payout: number, days: number, _region: string) => ({
+    pricingParams: (
+      threshold: number,
+      payout: number,
+      days: number,
+      _region: string
+    ) => ({
       coverage_type: "bridge_hack",
       payout_amount_usdc: payout,
       duration_days: days,
-      tvl_drop_threshold_pct: threshold,  // TVL floor in $M; pricing engine derives implied drop %
+      tvl_drop_threshold_pct: threshold, // TVL floor in $M; pricing engine derives implied drop %
     }),
     extraFields: [],
   },
@@ -257,10 +310,10 @@ export const COVERAGE_TYPES = [
 // ── On-chain pool pubkeys ─────────────────────────────────────────────────
 // type → pool pubkey on devnet
 export const POOL_BY_TYPE: Record<number, string> = {
-  0: "EHxPZAMvRhumjFeChfeD9bn2Ju1RWf7RM45pY5vzEhNH",  // Earthquake
-  1: "HfyGsQVVsxt6BNM7UzTepBo91DKYdqLy7RKuLrwnM1YY",  // Flood
-  2: "HuPG3dmBftRCAwg71tro7pmp2hjoCT8KWaNtytwUqUo2",  // Crop MultiF
-  3: "ZZWgmeRUSdQyuarSb2zPFron2x88UgexhTQn8hJr9uD",   // Hurricane
-  4: "CcGbU74HpT8sjDU5NDDWFzBPYEARBEfAac4ovDWwgxWU",  // Stablecoin Depeg
-  5: "AqKUYemw3A6GbYFnCFwE9S1f1QCfhH4EAjFQCDxyfUtQ",  // Bridge Hack
+  0: "EHxPZAMvRhumjFeChfeD9bn2Ju1RWf7RM45pY5vzEhNH", // Earthquake
+  1: "HfyGsQVVsxt6BNM7UzTepBo91DKYdqLy7RKuLrwnM1YY", // Flood
+  2: "HuPG3dmBftRCAwg71tro7pmp2hjoCT8KWaNtytwUqUo2", // Crop MultiF
+  3: "ZZWgmeRUSdQyuarSb2zPFron2x88UgexhTQn8hJr9uD", // Hurricane
+  4: "CcGbU74HpT8sjDU5NDDWFzBPYEARBEfAac4ovDWwgxWU", // Stablecoin Depeg
+  5: "AqKUYemw3A6GbYFnCFwE9S1f1QCfhH4EAjFQCDxyfUtQ", // Bridge Hack
 };

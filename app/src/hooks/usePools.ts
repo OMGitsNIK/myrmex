@@ -30,7 +30,8 @@ export function usePools() {
         return r.json();
       })
       .then((data: unknown) => {
-        if (!Array.isArray(data)) throw new Error("Unexpected API response shape");
+        if (!Array.isArray(data))
+          throw new Error("Unexpected API response shape");
         setPools(data as PoolData[]);
         setError(null);
       })

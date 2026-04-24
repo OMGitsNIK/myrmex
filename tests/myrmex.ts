@@ -75,7 +75,11 @@ describe("myrmex", () => {
       program.programId
     );
     [oracleReportPda] = anchor.web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("oracle_report"), poolPda.toBuffer(), Buffer.from(SCOPE_HASH)],
+      [
+        Buffer.from("oracle_report"),
+        poolPda.toBuffer(),
+        Buffer.from(SCOPE_HASH),
+      ],
       program.programId
     );
 
@@ -505,7 +509,11 @@ describe("myrmex", () => {
     // Post an oracle report first
     const preReportScopeHash = Array(32).fill(8);
     const [preReportPda] = anchor.web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("oracle_report"), poolPda.toBuffer(), Buffer.from(preReportScopeHash)],
+      [
+        Buffer.from("oracle_report"),
+        poolPda.toBuffer(),
+        Buffer.from(preReportScopeHash),
+      ],
       program.programId
     );
     await program.methods
@@ -657,7 +665,11 @@ describe("myrmex", () => {
   it("10. trigger_payout rejects mismatched scope hash", async () => {
     const wrongScopeHash = Array(32).fill(99);
     const [wrongScopePda] = anchor.web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("oracle_report"), poolPda.toBuffer(), Buffer.from(wrongScopeHash)],
+      [
+        Buffer.from("oracle_report"),
+        poolPda.toBuffer(),
+        Buffer.from(wrongScopeHash),
+      ],
       program.programId
     );
     await program.methods
@@ -732,7 +744,10 @@ describe("myrmex", () => {
         err.message.includes("OracleScopeMismatch") ||
         err.message.includes("seeds constraint") ||
         err.message.includes("ConstraintSeeds");
-      assert.isTrue(blocked, `Should fail on scope mismatch, got: ${err.message}`);
+      assert.isTrue(
+        blocked,
+        `Should fail on scope mismatch, got: ${err.message}`
+      );
       console.log("  Scope hash mismatch correctly rejected");
     }
   });
