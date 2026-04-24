@@ -42,8 +42,13 @@ _ORACLE_API_SECRET = os.environ.get("ORACLE_API_SECRET", "")
 
 
 def require_secret(x_oracle_secret: str = Header(default="")) -> None:
-    """Block write endpoints unless X-Oracle-Secret matches ORACLE_API_SECRET env var."""
-    if _ORACLE_API_SECRET and x_oracle_secret != _ORACLE_API_SECRET:
+    """Block write endpoints. Fails closed: rejects all requests if secret is unset."""
+    if not _ORACLE_API_SECRET:
+        raise HTTPException(
+            status_code=503,
+            detail="Server misconfigured: ORACLE_API_SECRET env var is not set",
+        )
+    if x_oracle_secret != _ORACLE_API_SECRET:
         raise HTTPException(status_code=401, detail="Unauthorized: invalid X-Oracle-Secret")
 
 

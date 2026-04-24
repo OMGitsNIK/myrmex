@@ -191,10 +191,15 @@ export default function GovernancePage() {
         ],
         PROGRAM_ID
       );
+      const [voterStakePda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("stake"), wallet.publicKey.toBuffer()],
+        PROGRAM_ID
+      );
       await (program as any).methods
         .castVote(proposalId, side === "for")
         .accounts({
           voter: wallet.publicKey,
+          voterStake: voterStakePda,
           proposal: proposalPda,
           voteRecord: voteRecordPda,
           systemProgram: anchor.web3.SystemProgram.programId,
@@ -254,6 +259,10 @@ export default function GovernancePage() {
       const descBytes = Array.from(Buffer.alloc(128).fill(0));
       Buffer.from(newDescription.slice(0, 127)).copy(Buffer.from(descBytes));
 
+      const [proposerStakePda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("stake"), wallet.publicKey.toBuffer()],
+        PROGRAM_ID
+      );
       await (program as any).methods
         .createProposal(
           proposalId,
@@ -263,6 +272,7 @@ export default function GovernancePage() {
         )
         .accounts({
           proposer: wallet.publicKey,
+          proposerStake: proposerStakePda,
           proposal: proposalPda,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
@@ -287,8 +297,9 @@ export default function GovernancePage() {
           Governance
         </h1>
         <p className="text-gray-400 mt-2">
-          Stake MYR tokens to vote on protocol parameters, new pool types, and
-          oracle configuration. All proposals and votes are on-chain.
+          Stake MYR to vote on protocol parameters, new pool types, and oracle
+          configuration. Vote weight is proportional to staked balance. All
+          proposals and votes are on-chain.
         </p>
       </div>
 
@@ -301,9 +312,9 @@ export default function GovernancePage() {
           </span>
         </div>
         <p className="text-sm text-gray-400">
-          Stake MYR to earn a share of protocol fees during the lock period. Any
-          connected wallet can vote on proposals — staking is separate from
-          governance voting.
+          Stake MYR to earn protocol fees and gain voting power. You must have
+          MYR staked to create proposals or vote — your vote weight equals your
+          staked balance.
         </p>
         <div className="flex gap-3">
           <input

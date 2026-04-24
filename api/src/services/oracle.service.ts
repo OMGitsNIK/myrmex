@@ -59,6 +59,11 @@ function loadOracleKeypair(): Keypair {
       Buffer.from(JSON.parse(process.env.ORACLE_KEYPAIR_JSON))
     );
   }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "ORACLE_KEYPAIR_JSON must be set in production — refusing to fall back to a disk key"
+    );
+  }
   const keyPath = path.join(
     process.env.HOME || "~",
     ".config/solana/oracle.json"
