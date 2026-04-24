@@ -40,8 +40,14 @@ pub fn handler(ctx: Context<ExpirePolicy>) -> Result<()> {
 
     // Free locked collateral — premiums remain in pool as yield for LPs
     let pool = &mut ctx.accounts.pool;
-    pool.total_locked = pool.total_locked.saturating_sub(payout_amount);
-    pool.active_policy_count = pool.active_policy_count.saturating_sub(1);
+    pool.total_locked = pool
+        .total_locked
+        .checked_sub(payout_amount)
+        .ok_or(error!(MyrmexError::MathOverflow))?;
+    pool.active_policy_count = pool
+        .active_policy_count
+        .checked_sub(1)
+        .ok_or(error!(MyrmexError::MathOverflow))?;
 
     emit!(PolicyExpired {
         policy: ctx.accounts.policy.key(),

@@ -4,7 +4,13 @@ import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import * as fs from "fs";
 import * as path from "path";
+import { ed25519 } from "@noble/curves/ed25519";
 import { getAnchorProgram } from "../services/anchor.service";
+
+// Message format: "myrmex-simulate:<policy>:<oracle_value>"
+// Binding the oracle value prevents a signed ownership proof from being
+// replayed at a different trigger value than the user intended.
+const SIMULATE_MESSAGE_PREFIX = "myrmex-simulate:";
 
 const router = Router();
 
@@ -66,11 +72,16 @@ router.post("/", async (req, res) => {
     return res.status(403).json({ error: "simulate-trigger is disabled in production" });
   }
   try {
-    const { policy: policyPubkeyStr, oracle_value, policyholder: callerStr } = req.body as {
+    const { policy: policyPubkeyStr, oracle_value, signature, message } = req.body as {
       policy: string;
       oracle_value: number;
-      policyholder?: string;
+      signature: number[];
+      message: number[];
     };
+
+    if (!signature || !message) {
+      return res.status(400).json({ error: "signature and message are required" });
+    }
 
     const { program, provider } = getAnchorProgram();
     const policyPk = new PublicKey(policyPubkeyStr);
@@ -78,12 +89,24 @@ router.post("/", async (req, res) => {
       policyPk
     )) as any;
 
-    // Require caller to identify themselves as the policyholder
+    // Verify the caller signed the expected message with the policyholder's key
     const onChainPolicyholder = (policyAccount.policyholder as PublicKey).toBase58();
-    if (!callerStr || callerStr !== onChainPolicyholder) {
-      return res.status(403).json({
-        error: "Only the policyholder can simulate a trigger for this policy",
-      });
+    // Message binds the policy pubkey AND the oracle value — prevents replaying a
+    // legitimate ownership proof at a different trigger value.
+    const expectedMessage = new TextEncoder().encode(
+      `${SIMULATE_MESSAGE_PREFIX}${policyPubkeyStr}:${oracle_value}`
+    );
+    const msgBytes = new Uint8Array(message);
+    const sigBytes = new Uint8Array(signature);
+    const pkBytes = new PublicKey(onChainPolicyholder).toBytes();
+
+    if (Buffer.from(msgBytes).toString() !== Buffer.from(expectedMessage).toString()) {
+      return res.status(403).json({ error: "Invalid message content" });
+    }
+
+    const valid = ed25519.verify(sigBytes, msgBytes, pkBytes);
+    if (!valid) {
+      return res.status(403).json({ error: "Signature verification failed — only the policyholder can simulate" });
     }
 
     const poolPk = policyAccount.pool as PublicKey;

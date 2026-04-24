@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { useAnchorWallet } from "@solana/wallet-adapter-react";
+import { useAnchorWallet, useWallet } from "@solana/wallet-adapter-react";
 import { API_URL, explorerUrl, COVERAGE_NAMES, COMPARISON_LABELS, USDC_DECIMALS } from "@/lib/constants";
 import { toast } from "sonner";
 
@@ -32,6 +32,7 @@ function SimulateInner() {
   const searchParams = useSearchParams();
   const prefillPolicy = searchParams.get("policy") ?? "";
   const wallet = useAnchorWallet();
+  const { signMessage } = useWallet();
 
   const [policyPubkey, setPolicyPubkey] = useState(prefillPolicy);
   const [oracleValue, setOracleValue] = useState(150);
@@ -91,12 +92,29 @@ function SimulateInner() {
     try {
       updateStep(0, { status: "running" });
       await delay(300);
+
+      // Sign ownership proof — binds both the policy pubkey and the oracle value
+      // so the signature cannot be replayed at a different trigger value.
+      const message = new TextEncoder().encode(`myrmex-simulate:${policyPubkey}:${oracleValue}`);
+      if (!signMessage) throw new Error("Wallet does not support signMessage");
+      let signature: Uint8Array;
+      try {
+        signature = await signMessage(message);
+      } catch {
+        throw new Error("Wallet signature rejected — needed to prove policy ownership");
+      }
+
       const t1 = Date.now();
 
       const res = await fetch(`${API_URL}/api/simulate-trigger`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ policy: policyPubkey, oracle_value: oracleValue, policyholder: wallet.publicKey.toBase58() }),
+        body: JSON.stringify({
+          policy: policyPubkey,
+          oracle_value: oracleValue,
+          message: Array.from(message),
+          signature: Array.from(signature),
+        }),
       });
 
       if (!res.ok) {

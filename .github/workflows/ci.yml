@@ -41,20 +41,56 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: rustup show
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'yarn'
+
       - name: Install dependencies
         run: yarn install --frozen-lockfile
-      - name: Install Solana and Anchor
-        uses: metadaoproject/setup-anchor@v3.1
+
+      - name: Cache Solana + Anchor binaries
+        id: cache-toolchain
+        uses: actions/cache@v4
         with:
-          anchor-version: "0.32.1"
-          solana-cli-version: "1.18.26"
-      - name: Run Anchor Test
-        run: anchor test
+          path: |
+            ~/.local/share/solana
+            ~/.avm
+            ~/.cargo/bin/avm
+            ~/.cargo/bin/anchor
+          key: ${{ runner.os }}-solana-2.2.21-anchor-0.32.1-v1
+
+      - name: Install Solana CLI (Agave 2.2.21)
+        if: steps.cache-toolchain.outputs.cache-hit != 'true'
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/v2.2.21/install)"
+
+      - name: Add Solana to PATH
+        run: echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+      - name: Install AVM and Anchor CLI 0.32.1
+        if: steps.cache-toolchain.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get install -y pkg-config libssl-dev
+          cargo install avm --git https://github.com/coral-xyz/anchor --locked --force
+          avm install 0.32.1
+          avm use 0.32.1
+
+      - name: Add AVM binaries to PATH
+        run: echo "$HOME/.avm/bin" >> $GITHUB_PATH
+
+      - name: Generate localnet wallet
+        run: |
+          mkdir -p ~/.config/solana
+          solana-keygen new --no-bip39-passphrase -o ~/.config/solana/id.json
+
+      - name: Run Anchor tests (localnet)
+        run: anchor test --provider.cluster localnet
 
   root-node-lint:
     runs-on: ubuntu-latest

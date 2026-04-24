@@ -4,6 +4,7 @@ use anchor_lang::prelude::*;
 pub struct GovernanceProposal {
     pub id: u64,
     pub proposer: Pubkey,
+    pub title: [u8; 64],
     pub description: [u8; 128],
     pub votes_for: u64,
     pub votes_against: u64,
@@ -14,5 +15,6 @@ pub struct GovernanceProposal {
 }
 
 impl GovernanceProposal {
-    pub const LEN: usize = 8 + 8 + 32 + 128 + 8 + 8 + 8 + 8 + 1 + 1; // 210
+    // 8 disc + 8 + 32 + 64 + 128 + 8 + 8 + 8 + 8 + 1 + 1
+    pub const LEN: usize = 274;
 }

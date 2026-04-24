@@ -1,67 +1,115 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAnchorProgram } from "@/hooks/useAnchorProgram";
 import * as anchor from "@coral-xyz/anchor";
+import { PublicKey } from "@solana/web3.js";
 import { toast } from "sonner";
-import { explorerUrl } from "@/lib/constants";
+import { API_URL } from "@/lib/constants";
+
+const PROGRAM_ID = new PublicKey("9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan");
 
 interface Proposal {
+  pubkey: string;
   id: number;
+  proposer: string;
   title: string;
   description: string;
-  status: "active" | "passed" | "rejected";
-  votesFor: number;
-  votesAgainst: number;
-  endsAt: Date;
+  votes_for: number;
+  votes_against: number;
+  created_at: number;
+  voting_ends_at: number;
+  executed: boolean;
+  status: "active" | "passed" | "rejected" | "executed";
 }
 
-const MOCK_PROPOSALS: Proposal[] = [
-  {
-    id: 1,
-    title: "Add Wildfire Coverage Pool",
-    description:
-      "Initialize a new RiskPool (type 6) backed by NASA FIRMS fire data. Trigger when FRP (Fire Radiative Power) exceeds threshold in insured region. Oracle: NASA FIRMS + USGS satellite.",
-    status: "active",
-    votesFor: 142,
-    votesAgainst: 23,
-    endsAt: new Date(Date.now() + 5 * 86400_000),
-  },
-  {
-    id: 2,
-    title: "Raise max oracle staleness to 48h",
-    description:
-      "Current MAX_AGE_SECS = 86400 (24h). Proposal to raise to 172800 (48h) for hurricane pool during off-season when NHC may not publish updates daily.",
-    status: "active",
-    votesFor: 87,
-    votesAgainst: 61,
-    endsAt: new Date(Date.now() + 3 * 86400_000),
-  },
-  {
-    id: 3,
-    title: "Reduce minimum premium from 50bps to 30bps",
-    description:
-      "Stablecoin depeg pool min premium is currently 50bps. Reduce to 30bps to make small cover amounts economically viable for retail users.",
-    status: "passed",
-    votesFor: 210,
-    votesAgainst: 44,
-    endsAt: new Date(Date.now() - 2 * 86400_000),
-  },
-];
+function timeLeft(endsAt: number): string {
+  const diff = endsAt * 1000 - Date.now();
+  if (diff <= 0) return "Ended";
+  const d = Math.floor(diff / 86400_000);
+  const h = Math.floor((diff % 86400_000) / 3600_000);
+  return d > 0 ? `${d}d ${h}h left` : `${h}h left`;
+}
+
+function statusBadge(status: string) {
+  const cls =
+    status === "active" ? "bg-[var(--accent-dim)] text-[var(--accent)]"
+    : status === "passed" || status === "executed" ? "bg-blue-500/20 text-blue-400"
+    : "bg-red-500/20 text-red-400";
+  const label =
+    status === "active" ? "● Active"
+    : status === "passed" ? "✓ Passed"
+    : status === "executed" ? "✓ Executed"
+    : "✗ Rejected";
+  return <span className={`text-xs px-2 py-0.5 rounded font-medium ${cls}`}>{label}</span>;
+}
 
 export default function GovernancePage() {
   const { program, wallet } = useAnchorProgram();
+
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [loadingProposals, setLoadingProposals] = useState(true);
+  const [votes, setVotes] = useState<Record<number, "for" | "against">>({});
+  const [checkingVotes, setCheckingVotes] = useState(false);
+  const [voting, setVoting] = useState<number | null>(null);
+
+  // Stake panel
   const [stakeAmount, setStakeAmount] = useState(100);
   const [staking, setStaking] = useState(false);
   const [staked, setStaked] = useState(false);
-  const [voting, setVoting] = useState<number | null>(null);
-  const [votes, setVotes] = useState<Record<number, "for" | "against">>({});
+
+  // Create proposal panel
+  const [showCreate, setShowCreate] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [durationDays, setDurationDays] = useState(7);
+  const [creating, setCreating] = useState(false);
+
+  const fetchProposals = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/proposals`);
+      if (res.ok) setProposals(await res.json());
+    } catch { /* noop */ }
+    finally { setLoadingProposals(false); }
+  }, []);
+
+  // Check on-chain VoteRecord accounts so vote state survives page refresh
+  const checkVoteRecords = useCallback(async (proposalList: Proposal[]) => {
+    if (!wallet || !program || proposalList.length === 0) return;
+    setCheckingVotes(true);
+    const newVotes: Record<number, "for" | "against"> = {};
+    await Promise.allSettled(
+      proposalList.map(async (p) => {
+        const proposalId = new anchor.BN(p.id);
+        const [proposalPda] = PublicKey.findProgramAddressSync(
+          [Buffer.from("proposal"), proposalId.toArrayLike(Buffer, "le", 8)],
+          PROGRAM_ID
+        );
+        const [voteRecordPda] = PublicKey.findProgramAddressSync(
+          [Buffer.from("vote_record"), proposalPda.toBuffer(), wallet.publicKey.toBuffer()],
+          PROGRAM_ID
+        );
+        try {
+          const record = await (program as any).account.voteRecord.fetchNullable(voteRecordPda);
+          if (record) newVotes[p.id] = record.vote ? "for" : "against";
+        } catch { /* no record = not voted */ }
+      })
+    );
+    setVotes(newVotes);
+    setCheckingVotes(false);
+  }, [wallet, program]);
+
+  useEffect(() => { fetchProposals(); }, [fetchProposals]);
+
+  // Re-check vote state whenever wallet or proposals change
+  useEffect(() => {
+    if (proposals.length > 0) checkVoteRecords(proposals);
+  }, [proposals, wallet, checkVoteRecords]);
 
   const handleStake = async () => {
     if (!program || !wallet) { toast.error("Connect wallet first"); return; }
     setStaking(true);
     try {
-      // stake_myr instruction — 7-day lock period
       const [stakeAccountPda] = anchor.web3.PublicKey.findProgramAddressSync(
         [Buffer.from("stake"), wallet.publicKey.toBuffer()],
         program.programId
@@ -69,63 +117,106 @@ export default function GovernancePage() {
       await program.methods
         .stakeMyr(new anchor.BN(stakeAmount * 1_000_000))
         .accounts({
-          staker: wallet.publicKey,
+          owner: wallet.publicKey,
           stakeAccount: stakeAccountPda,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
         .rpc();
       setStaked(true);
-      toast.success(`Staked ${stakeAmount} MYR for governance voting (7-day lock)`);
+      toast.success(`Staked ${stakeAmount} MYR — you can now vote on active proposals`);
     } catch (e: unknown) {
       const err = e as Error;
       if (err.message?.includes("Account does not exist") || err.message?.includes("not found")) {
-        toast.info("Stake account not yet initialized on this wallet — governance in final devnet phase");
+        toast.info("Stake account not yet initialized on this wallet");
       } else {
         toast.error("Stake failed", { description: err.message });
       }
-    } finally {
-      setStaking(false);
-    }
+    } finally { setStaking(false); }
   };
 
-  const handleVote = async (proposalId: number, side: "for" | "against") => {
-    if (!wallet) { toast.error("Connect wallet first"); return; }
-    setVoting(proposalId);
+  const handleVote = async (proposal: Proposal, side: "for" | "against") => {
+    if (!wallet || !program) { toast.error("Connect wallet first"); return; }
+    setVoting(proposal.id);
     try {
-      // cast_vote instruction — requires staked MYR
-      if (program) {
-        const [stakeAccountPda] = anchor.web3.PublicKey.findProgramAddressSync(
-          [Buffer.from("stake"), wallet.publicKey.toBuffer()],
-          program.programId
-        );
-        await program.methods
-          .castVote(new anchor.BN(proposalId), side === "for" ? 1 : 0)
-          .accounts({
-            voter: wallet.publicKey,
-            stakeAccount: stakeAccountPda,
-          })
-          .rpc();
-      }
-      setVotes((prev) => ({ ...prev, [proposalId]: side }));
-      toast.success(`Voted ${side === "for" ? "✓ For" : "✗ Against"} Proposal #${proposalId}`);
+      const proposalId = new anchor.BN(proposal.id);
+      const [proposalPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("proposal"), proposalId.toArrayLike(Buffer, "le", 8)],
+        PROGRAM_ID
+      );
+      const [voteRecordPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("vote_record"), proposalPda.toBuffer(), wallet.publicKey.toBuffer()],
+        PROGRAM_ID
+      );
+      await (program as any).methods
+        .castVote(proposalId, side === "for")
+        .accounts({
+          voter: wallet.publicKey,
+          proposal: proposalPda,
+          voteRecord: voteRecordPda,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .rpc();
+      setVotes((prev) => ({ ...prev, [proposal.id]: side }));
+      toast.success(`Voted ${side === "for" ? "✓ For" : "✗ Against"} MIP-${proposal.id}`);
     } catch (e: unknown) {
-      const err = e as Error;
-      if (err.message?.includes("Account does not exist") || err.message?.includes("not found")) {
-        toast.error("Vote failed: stake account not found. Stake MYR first to participate in governance.");
+      const msg = (e as Error).message ?? "";
+      const alreadyVoted =
+        msg.includes("already in use") ||
+        msg.includes("already been processed") ||
+        msg.includes("0x0") ||
+        msg.includes("AccountAlreadyInitialized");
+      if (alreadyVoted) {
+        toast.error("Already voted — each wallet can only vote once per proposal");
+        // Sync on-chain state so UI reflects the correct voted status
+        checkVoteRecords(proposals);
       } else {
-        toast.error("Vote failed", { description: err.message });
+        toast.error("Vote failed", { description: msg });
       }
-    } finally {
-      setVoting(null);
-    }
+    } finally { setVoting(null); }
   };
 
-  const daysLeft = (d: Date) => {
-    const diff = d.getTime() - Date.now();
-    if (diff < 0) return "Ended";
-    const days = Math.floor(diff / 86400_000);
-    const hours = Math.floor((diff % 86400_000) / 3600_000);
-    return days > 0 ? `${days}d ${hours}h left` : `${hours}h left`;
+  const handleCreate = async () => {
+    if (!program || !wallet) { toast.error("Connect wallet first"); return; }
+    if (!newTitle.trim()) { toast.error("Title required"); return; }
+    if (!newDescription.trim()) { toast.error("Description required"); return; }
+
+    setCreating(true);
+    try {
+      // Use unix timestamp as unique proposal ID
+      const proposalId = new anchor.BN(Math.floor(Date.now() / 1000));
+      const [proposalPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("proposal"), proposalId.toArrayLike(Buffer, "le", 8)],
+        PROGRAM_ID
+      );
+
+      const titleBytes = Array.from(Buffer.alloc(64).fill(0));
+      Buffer.from(newTitle.slice(0, 63)).copy(Buffer.from(titleBytes));
+
+      const descBytes = Array.from(Buffer.alloc(128).fill(0));
+      Buffer.from(newDescription.slice(0, 127)).copy(Buffer.from(descBytes));
+
+      await (program as any).methods
+        .createProposal(
+          proposalId,
+          titleBytes,
+          descBytes,
+          new anchor.BN(durationDays * 86_400)
+        )
+        .accounts({
+          proposer: wallet.publicKey,
+          proposal: proposalPda,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .rpc();
+
+      toast.success("Proposal created on-chain");
+      setNewTitle("");
+      setNewDescription("");
+      setShowCreate(false);
+      setTimeout(fetchProposals, 2000);
+    } catch (e: unknown) {
+      toast.error("Create failed", { description: (e as Error).message });
+    } finally { setCreating(false); }
   };
 
   return (
@@ -134,7 +225,7 @@ export default function GovernancePage() {
         <h1 className="text-3xl font-bold text-white tracking-tight">Governance</h1>
         <p className="text-gray-400 mt-2">
           Stake MYR tokens to vote on protocol parameters, new pool types, and oracle configuration.
-          All changes are enforced on-chain after quorum is reached.
+          All proposals and votes are on-chain.
         </p>
       </div>
 
@@ -145,8 +236,8 @@ export default function GovernancePage() {
           <span className="text-xs text-gray-500 bg-[var(--surface-2)] px-2 py-1 rounded">7-day lock</span>
         </div>
         <p className="text-sm text-gray-400">
-          Staked MYR grants voting power proportional to your stake. Tokens are locked for 7 days
-          and earn a share of protocol fees during the lock period.
+          Stake MYR to earn a share of protocol fees during the lock period.
+          Any connected wallet can vote on proposals — staking is separate from governance voting.
         </p>
         <div className="flex gap-3">
           <input
@@ -168,98 +259,170 @@ export default function GovernancePage() {
         {staked && (
           <div className="flex items-center gap-2 text-sm text-[var(--accent)]">
             <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse inline-block" />
-            Staked — you can now vote on active proposals
+            Staked — earning protocol fee share during lock period
           </div>
         )}
-        {!wallet && (
-          <p className="text-xs text-gray-600">Connect wallet to stake and vote.</p>
-        )}
+        {!wallet && <p className="text-xs text-gray-600">Connect wallet to stake and vote.</p>}
       </div>
 
-      {/* Proposals */}
+      {/* Proposals header */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-white">
+          Proposals
+          {!loadingProposals && (
+            <span className="ml-2 text-sm font-normal text-gray-500">({proposals.length} on-chain)</span>
+          )}
+          {checkingVotes && (
+            <span className="ml-2 text-xs font-normal text-gray-600">checking votes…</span>
+          )}
+        </h2>
+        <button
+          onClick={() => setShowCreate((v) => !v)}
+          className="text-sm border border-[var(--border)] hover:border-[var(--accent)]/50 text-gray-300 px-4 py-1.5 rounded-lg transition-colors"
+        >
+          {showCreate ? "Cancel" : "+ New Proposal"}
+        </button>
+      </div>
+
+      {/* Create proposal form */}
+      {showCreate && (
+        <div className="card p-6 space-y-4 border border-[var(--accent)]/30">
+          <h3 className="font-semibold text-white text-sm">New On-Chain Proposal</h3>
+          <label className="block space-y-1">
+            <span className="text-xs text-gray-500">Title (max 63 chars)</span>
+            <input
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              maxLength={63}
+              placeholder="Add Wildfire Coverage Pool"
+              className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white text-sm focus:border-[var(--accent)]/50 outline-none"
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs text-gray-500">Description (max 127 chars)</span>
+            <textarea
+              value={newDescription}
+              onChange={(e) => setNewDescription(e.target.value)}
+              maxLength={127}
+              rows={3}
+              placeholder="Describe what this proposal changes and why…"
+              className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white text-sm focus:border-[var(--accent)]/50 outline-none resize-none"
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs text-gray-500">Voting duration (days, 1–30)</span>
+            <input
+              type="number"
+              value={durationDays}
+              onChange={(e) => setDurationDays(Math.min(30, Math.max(1, Number(e.target.value))))}
+              min={1} max={30}
+              className="w-32 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white text-sm focus:border-[var(--accent)]/50 outline-none"
+            />
+          </label>
+          <button
+            onClick={handleCreate}
+            disabled={creating || !wallet}
+            className="bg-[var(--accent)] hover:opacity-90 disabled:opacity-40 text-black font-bold px-6 py-2 rounded-lg text-sm transition-opacity"
+          >
+            {creating ? "Creating…" : "Create Proposal On-Chain"}
+          </button>
+          {!wallet && <p className="text-xs text-gray-600">Connect wallet to create a proposal.</p>}
+        </div>
+      )}
+
+      {/* Proposal list */}
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-white">Proposals</h2>
-        {MOCK_PROPOSALS.map((p) => {
-          const total = p.votesFor + p.votesAgainst;
-          const forPct = total > 0 ? (p.votesFor / total) * 100 : 50;
-          const myVote = votes[p.id];
+        {loadingProposals ? (
+          <div className="card p-6 text-center text-gray-500 text-sm">Loading proposals from chain…</div>
+        ) : proposals.length === 0 ? (
+          <div className="card p-6 text-center text-gray-500 text-sm">No proposals found on-chain yet.</div>
+        ) : (
+          proposals.map((p) => {
+            const total = p.votes_for + p.votes_against;
+            const forPct = total > 0 ? (p.votes_for / total) * 100 : 50;
+            const myVote = votes[p.id];
 
-          return (
-            <div key={p.id} className="card p-6 space-y-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500 font-mono">MIP-{p.id}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded font-medium ${
-                      p.status === "active" ? "bg-[var(--accent-dim)] text-[var(--accent)]"
-                      : p.status === "passed" ? "bg-blue-500/20 text-blue-400"
-                      : "bg-red-500/20 text-red-400"
-                    }`}>
-                      {p.status === "active" ? "● Active" : p.status === "passed" ? "✓ Passed" : "✗ Rejected"}
-                    </span>
+            return (
+              <div key={p.pubkey} className="card p-6 space-y-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 font-mono">MIP-{p.id}</span>
+                      {statusBadge(p.status)}
+                    </div>
+                    <h3 className="text-white font-semibold">{p.title}</h3>
                   </div>
-                  <h3 className="text-white font-semibold">{p.title}</h3>
+                  <span className="text-xs text-gray-500 whitespace-nowrap shrink-0">
+                    {timeLeft(p.voting_ends_at)}
+                  </span>
                 </div>
-                <span className="text-xs text-gray-500 whitespace-nowrap">{daysLeft(p.endsAt)}</span>
+
+                <p className="text-sm text-gray-400 leading-relaxed">{p.description}</p>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>For: {p.votes_for + (myVote === "for" ? 1 : 0)}</span>
+                    <span>Against: {p.votes_against + (myVote === "against" ? 1 : 0)}</span>
+                  </div>
+                  <div className="h-1.5 bg-[var(--surface-2)] rounded-full overflow-hidden flex">
+                    <div className="h-full bg-[var(--accent)] transition-all" style={{ width: `${forPct}%` }} />
+                    <div className="h-full bg-red-500/60 flex-1" />
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-gray-600">
+                    <span>{forPct.toFixed(1)}% in favor · Quorum: 100 votes</span>
+                    <a
+                      href={`https://explorer.solana.com/address/${p.pubkey}?cluster=devnet`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-gray-600 hover:text-gray-400 font-mono"
+                    >
+                      {p.pubkey.slice(0, 8)}… ↗
+                    </a>
+                  </div>
+                </div>
+
+                {p.status === "active" && (
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => handleVote(p, "for")}
+                      disabled={voting === p.id || myVote !== undefined || checkingVotes}
+                      className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                        myVote === "for"
+                          ? "bg-[var(--accent-dim)] border border-[var(--accent)] text-[var(--accent)]"
+                          : "border border-[var(--border)] text-gray-300 hover:border-[var(--accent)]/50 disabled:opacity-40"
+                      }`}
+                    >
+                      {myVote === "for" ? "✓ Voted For" : voting === p.id ? "Voting…" : "Vote For"}
+                    </button>
+                    <button
+                      onClick={() => handleVote(p, "against")}
+                      disabled={voting === p.id || myVote !== undefined || checkingVotes}
+                      className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                        myVote === "against"
+                          ? "bg-red-500/10 border border-red-500/60 text-red-400"
+                          : "border border-[var(--border)] text-gray-300 hover:border-red-500/40 disabled:opacity-40"
+                      }`}
+                    >
+                      {myVote === "against" ? "✗ Voted Against" : "Vote Against"}
+                    </button>
+                  </div>
+                )}
               </div>
-
-              <p className="text-sm text-gray-400 leading-relaxed">{p.description}</p>
-
-              {/* Vote bar */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-xs text-gray-500">
-                  <span>For: {p.votesFor + (myVote === "for" ? 1 : 0)}</span>
-                  <span>Against: {p.votesAgainst + (myVote === "against" ? 1 : 0)}</span>
-                </div>
-                <div className="h-1.5 bg-[var(--surface-2)] rounded-full overflow-hidden flex">
-                  <div
-                    className="h-full bg-[var(--accent)] transition-all"
-                    style={{ width: `${forPct}%` }}
-                  />
-                  <div className="h-full bg-red-500/60 flex-1" />
-                </div>
-                <div className="text-xs text-gray-600">{forPct.toFixed(1)}% in favor · Quorum: 100 votes</div>
-              </div>
-
-              {p.status === "active" && (
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => handleVote(p.id, "for")}
-                    disabled={voting === p.id || myVote !== undefined}
-                    className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                      myVote === "for"
-                        ? "bg-[var(--accent-dim)] border border-[var(--accent)] text-[var(--accent)]"
-                        : "border border-[var(--border)] text-gray-300 hover:border-[var(--accent)]/50 disabled:opacity-40"
-                    }`}
-                  >
-                    {myVote === "for" ? "✓ Voted For" : voting === p.id ? "Voting…" : "Vote For"}
-                  </button>
-                  <button
-                    onClick={() => handleVote(p.id, "against")}
-                    disabled={voting === p.id || myVote !== undefined}
-                    className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                      myVote === "against"
-                        ? "bg-red-500/10 border border-red-500/60 text-red-400"
-                        : "border border-[var(--border)] text-gray-300 hover:border-red-500/40 disabled:opacity-40"
-                    }`}
-                  >
-                    {myVote === "against" ? "✗ Voted Against" : "Vote Against"}
-                  </button>
-                </div>
-              )}
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
 
       {/* Explainer */}
       <div className="card p-6 space-y-2 text-sm text-gray-400">
-        <p><span className="text-white font-medium">On-chain instructions:</span>{" "}
-          <code className="text-[var(--accent)]">stake_myr</code> locks tokens in a PDA stake account with a 7-day unlock timestamp.
-          <code className="text-[var(--accent)] ml-1">cast_vote</code> records your vote and validates your stake account hasn&apos;t expired.
+        <p>
+          <span className="text-white font-medium">On-chain instructions: </span>
+          <code className="text-[var(--accent)]">create_proposal</code> initializes a PDA keyed by proposal ID with a configurable voting window.
+          <code className="text-[var(--accent)] ml-1">cast_vote</code> records your vote — any connected wallet can vote, one vote per tx.
+          <code className="text-[var(--accent)] ml-1">stake_myr</code> locks tokens for protocol fee sharing (separate from voting).
         </p>
         <p>
-          Proposals are currently indexed off-chain. Full on-chain proposal creation coming in v2.1.
+          All proposal state lives on-chain. Proposals and votes are permanent and publicly verifiable.
         </p>
       </div>
     </div>

@@ -40,8 +40,8 @@ exports.startOracleCron = startOracleCron;
 /**
  * Oracle service — 5-minute cron inside the API process.
  *
- * Six real-world data pipelines, each with dual-source cross-checking
- * and Groq LLaMA-3.3-70b AI validation before posting on-chain.
+ * Six real-world data pipelines, each with dual-source cross-checking.
+ * Data is posted on-chain as-is; no AI intermediary.
  *
  * On-chain value encoding:
  *   Earthquake  : USGS magnitude × 100   (e.g. M6.5 → 650)
@@ -54,7 +54,6 @@ exports.startOracleCron = startOracleCron;
 const node_cron_1 = __importDefault(require("node-cron"));
 const anchor = __importStar(require("@coral-xyz/anchor"));
 const web3_js_1 = require("@solana/web3.js");
-const groq_sdk_1 = __importDefault(require("groq-sdk"));
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const crypto_1 = require("crypto");
@@ -100,20 +99,33 @@ function getOracleProgram() {
     const idl = JSON.parse(fs.readFileSync(idlPath, "utf-8"));
     return { program: new anchor.Program(idl, provider), provider };
 }
-function toDescBytes(s) {
+/**
+ * Encodes description as: sha256:<64-hex>|<human text>
+ * The SHA-256 of the raw primary API response is embedded so anyone can
+ * independently verify the on-chain value by rehashing the source data.
+ */
+function toDescBytes(humanText, sourceHash) {
+    const prefix = sourceHash ? `sha256:${sourceHash}|` : "";
+    // Slice by byte length to avoid truncating mid-multi-byte character
+    const combined = prefix + humanText;
+    const fullBuf = Buffer.from(combined, "utf8");
     const buf = Buffer.alloc(192);
-    buf.write(s.slice(0, 191), "utf8");
+    fullBuf.copy(buf, 0, 0, 191);
     return Array.from(buf);
+}
+function sourceHashOf(rawPayload) {
+    return (0, crypto_1.createHash)("sha256").update(rawPayload).digest("hex");
 }
 function scopeHash(seed) {
     return Array.from((0, crypto_1.createHash)("sha256").update(seed).digest());
 }
-async function postReport(poolPk, value, scope, description) {
+async function postReport(poolPk, value, scope, description, rawPayload) {
     const { program, provider } = getOracleProgram();
     const [poolConfigPda] = web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("pool_config"), poolPk.toBuffer()], PROGRAM_ID);
     const [oracleReportPda] = web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("oracle_report"), poolPk.toBuffer(), Buffer.from(scope)], PROGRAM_ID);
+    const srcHash = rawPayload ? sourceHashOf(rawPayload) : undefined;
     return program.methods
-        .postOracleReport(new anchor.BN(value), scope, toDescBytes(description))
+        .postOracleReport(new anchor.BN(value), scope, toDescBytes(description, srcHash))
         .accounts({
         oracleAuthority: provider.wallet.publicKey,
         pool: poolPk,
@@ -123,48 +135,20 @@ async function postReport(poolPk, value, scope, description) {
     })
         .rpc();
 }
-async function groqValidate(context) {
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey)
-        return { approved: true, reasoning: "Sanity check passed (Groq unavailable)" };
-    try {
-        const groq = new groq_sdk_1.default({ apiKey });
-        const resp = await groq.chat.completions.create({
-            model: "llama-3.3-70b-versatile",
-            max_tokens: 100,
-            temperature: 0,
-            messages: [
-                {
-                    role: "system",
-                    content: "You are a parametric insurance oracle validator. Given sensor data and cross-check sources, " +
-                        "decide if the reading is plausible and data sources agree. " +
-                        "Reply ONLY with valid JSON: {\"approved\":true/false,\"reasoning\":\"one concise sentence\"}",
-                },
-                { role: "user", content: context },
-            ],
-        });
-        const raw = resp.choices[0]?.message?.content ?? "";
-        const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-        return JSON.parse(cleaned);
-    }
-    catch {
-        return { approved: true, reasoning: "Validation fallback: data within expected bounds" };
-    }
-}
 // ── 1. Earthquake — USGS Real-time Feed ──────────────────────────────────
 async function fetchEarthquake() {
-    // Primary: USGS significant earthquakes last 24h (M4.5+)
     const url = "https://earthquake.usgs.gov/fdsnws/event/1/query" +
         "?format=geojson&minmagnitude=4.5&orderby=magnitude&limit=1";
     const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
-    const data = (await resp.json());
+    const rawPayload = await resp.text();
+    const data = JSON.parse(rawPayload);
     const features = data.features ?? [];
     if (features.length === 0)
-        return { magnitude: 0, place: "No M4.5+ events", sources: "USGS FDSN" };
+        return { magnitude: 0, place: "No M4.5+ events", sources: "USGS FDSN", rawPayload };
     const top = features[0];
     const mag = top.properties.mag ?? 0;
     const place = top.properties.place ?? "Unknown";
-    // Cross-check: USGS atom feed count (different endpoint)
+    // Cross-check: USGS 24h count (different endpoint)
     let count2 = 0;
     try {
         const r2 = await fetch("https://earthquake.usgs.gov/fdsnws/event/1/count?format=geojson&minmagnitude=4.5", { signal: AbortSignal.timeout(8000) });
@@ -175,19 +159,20 @@ async function fetchEarthquake() {
     return {
         magnitude: mag,
         place,
-        sources: `USGS top-event M${mag.toFixed(1)} @ ${place} | USGS 24h count: ${count2} events`,
+        sources: `USGS top M${mag.toFixed(1)} @ ${place} | 24h count: ${count2}`,
+        rawPayload,
     };
 }
 // ── 2. Flood — USGS Water Services ───────────────────────────────────────
 async function fetchFlood() {
-    // Primary: USGS instantaneous values (stage height, param 00065)
     const url = `https://waterservices.usgs.gov/nwis/iv/?format=json&sites=${USGS_FLOOD_SITE}&parameterCd=00065`;
     const resp = await fetch(url, { signal: AbortSignal.timeout(12000) });
-    const data = (await resp.json());
+    const rawPayload = await resp.text();
+    const data = JSON.parse(rawPayload);
     const ts = data?.value?.timeSeries?.[0];
     const siteName = ts?.sourceInfo?.siteName ?? `Site ${USGS_FLOOD_SITE}`;
     const gaugeFt = parseFloat(ts?.values?.[0]?.value?.[0]?.value ?? "0") || 0;
-    // Cross-check: USGS statistics service (median gauge for this site)
+    // Cross-check: USGS statistics service (historical median for this day)
     let medianFt = null;
     try {
         const today = new Date();
@@ -199,13 +184,12 @@ async function fetchFlood() {
         medianFt = rec ? parseFloat(rec.value) : null;
     }
     catch { /* ignore */ }
-    const crossCheck = medianFt !== null
-        ? ` | Historical median: ${medianFt.toFixed(1)} ft`
-        : "";
+    const crossCheck = medianFt !== null ? ` | median: ${medianFt.toFixed(1)}ft` : "";
     return {
         gaugeFt,
         siteName,
-        sources: `USGS ${siteName}: ${gaugeFt.toFixed(1)} ft${crossCheck}`,
+        sources: `USGS ${siteName}: ${gaugeFt.toFixed(1)}ft${crossCheck}`,
+        rawPayload,
     };
 }
 // ── 3. Crop Multi-Factor — Open-Meteo composite ───────────────────────────
@@ -213,24 +197,20 @@ async function fetchCropComposite() {
     const today = new Date();
     const end = today.toISOString().split("T")[0];
     const start14 = new Date(today.getTime() - 14 * 86400000).toISOString().split("T")[0];
-    // Open-Meteo: last 14 days of weather at crop location
     const url = `https://archive-api.open-meteo.com/v1/archive` +
         `?latitude=${CROP_LAT}&longitude=${CROP_LON}` +
         `&daily=precipitation_sum,temperature_2m_max,temperature_2m_min` +
         `&timezone=auto&start_date=${start14}&end_date=${end}`;
     const resp = await fetch(url, { signal: AbortSignal.timeout(12000) });
-    const data = (await resp.json());
+    const rawPayload = await resp.text();
+    const data = JSON.parse(rawPayload);
     const daily = data.daily ?? {};
     const precip = daily.precipitation_sum ?? [];
     const tMax = daily.temperature_2m_max ?? [];
-    const tMin = daily.temperature_2m_min ?? [];
-    // Rainfall deficit: ideal = 3mm/day; score 0-10000
     const avgPrecip = precip.length ? precip.reduce((a, b) => a + (b ?? 0), 0) / precip.length : 0;
     const precipScore = Math.min(10000, Math.round((avgPrecip / 3.0) * 10000));
-    // Heat stress: days above 35°C penalize crops
     const heatDays = tMax.filter((t) => t > 35).length;
     const heatScore = Math.max(0, 10000 - heatDays * 1000);
-    // Consecutive dry days (precip < 1mm)
     let maxDryStreak = 0, streak = 0;
     for (const p of precip) {
         if ((p ?? 0) < 1) {
@@ -241,25 +221,23 @@ async function fetchCropComposite() {
             streak = 0;
     }
     const dryScore = Math.max(0, 10000 - maxDryStreak * 800);
-    // Weighted composite: precip 40%, heat 30%, dry streak 30%
     const composite = Math.round(precipScore * 0.4 + heatScore * 0.3 + dryScore * 0.3);
-    const sources = `Open-Meteo 14-day @ ${CROP_LAT},${CROP_LON}: ` +
-        `rain=${avgPrecip.toFixed(1)}mm/day heat=${heatDays}d>35°C dry_streak=${maxDryStreak}d ` +
-        `composite=${composite}/10000`;
-    return { score: composite, sources };
+    const sources = `Open-Meteo 14d @ ${CROP_LAT},${CROP_LON}: ` +
+        `rain=${avgPrecip.toFixed(1)}mm/d heat=${heatDays}d>35C dry=${maxDryStreak}d score=${composite}/10000`;
+    return { score: composite, sources, rawPayload };
 }
 // ── 4. Hurricane — NOAA NHC + Weather.gov Alerts ─────────────────────────
 async function fetchHurricane() {
     let windKnots = 0;
     let stormName = "No active storm";
-    // Primary: NOAA NHC active storms JSON
+    let rawPayload = "{}";
     try {
         const resp = await fetch("https://www.nhc.noaa.gov/CurrentStorms.json", {
             signal: AbortSignal.timeout(10000),
         });
-        const data = (await resp.json());
+        rawPayload = await resp.text();
+        const data = JSON.parse(rawPayload);
         const storms = data?.activeStorms ?? [];
-        // Find strongest storm
         for (const s of storms) {
             const winds = parseInt(s.intensity ?? "0", 10);
             if (winds > windKnots) {
@@ -269,7 +247,6 @@ async function fetchHurricane() {
         }
     }
     catch { /* NHC may be rate-limited */ }
-    // Cross-check: weather.gov active hurricane/tropical storm alerts
     let alertCount = 0;
     try {
         const r2 = await fetch("https://api.weather.gov/alerts/active?event=Hurricane+Warning,Tropical+Storm+Warning", { headers: { "User-Agent": "myrmex-oracle/1.0" }, signal: AbortSignal.timeout(8000) });
@@ -280,19 +257,19 @@ async function fetchHurricane() {
     return {
         windKnots,
         name: stormName,
-        sources: `NHC: ${stormName} ${windKnots}kt | Weather.gov alerts: ${alertCount}`,
+        sources: `NHC: ${stormName} ${windKnots}kt | wx.gov alerts: ${alertCount}`,
+        rawPayload,
     };
 }
-// ── 5. Stablecoin Depeg — CoinGecko + on-chain ────────────────────────────
+// ── 5. Stablecoin Depeg — CoinGecko ──────────────────────────────────────
 async function fetchStablecoinPrice() {
-    // Primary: CoinGecko free API
     const resp = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=usd-coin,tether&vs_currencies=usd&precision=6", { signal: AbortSignal.timeout(10000) });
-    const data = (await resp.json());
+    const rawPayload = await resp.text();
+    const data = JSON.parse(rawPayload);
     const usdcPrice = data?.["usd-coin"]?.usd ?? 1.0;
     const usdtPrice = data?.["tether"]?.usd ?? 1.0;
     const usdcBps = Math.round(usdcPrice * 10000);
     const usdtBps = Math.round(usdtPrice * 10000);
-    // Cross-check: CoinGecko market data for USDC (different endpoint)
     let usdcMarketCap = null;
     try {
         const r2 = await fetch("https://api.coingecko.com/api/v3/coins/usd-coin?localization=false&tickers=false&community_data=false&developer_data=false", { signal: AbortSignal.timeout(8000) });
@@ -305,120 +282,89 @@ async function fetchStablecoinPrice() {
         usdcBps,
         usdtBps,
         sources: `CoinGecko USDC=$${usdcPrice.toFixed(4)} USDT=$${usdtPrice.toFixed(4)}${mcStr}`,
+        rawPayload,
     };
 }
-// ── 6. Bridge/Exchange Hack — DeFiLlama bridges + hacks ──────────────────
-// multichain removed — hacked and shut down 2023, DeFiLlama data is stale
+// ── 6. Bridge/Exchange Hack — DeFiLlama ──────────────────────────────────
 const BRIDGE_PROTOCOLS = ["wormhole", "stargate", "across"];
 async function fetchBridgeTvl() {
-    // Primary: DeFiLlama TVL for top bridges
     let totalTvl = 0;
+    let rawPayload = "{}";
     const tvls = [];
     for (const protocol of BRIDGE_PROTOCOLS) {
         try {
             const resp = await fetch(`https://api.llama.fi/tvl/${protocol}`, { signal: AbortSignal.timeout(8000) });
-            const tvl = parseFloat(await resp.text());
+            const text = await resp.text();
+            const tvl = parseFloat(text);
             if (!isNaN(tvl) && tvl > 0) {
                 totalTvl += tvl;
                 tvls.push(`${protocol}=$${(tvl / 1e9).toFixed(2)}B`);
+                if (protocol === "wormhole")
+                    rawPayload = JSON.stringify({ protocol, tvl: text.trim() });
             }
         }
         catch { /* ignore */ }
     }
     const tvlMillions = Math.round(totalTvl / 1000000);
-    // Cross-check: Wormhole TVL via DeFiLlama per-chain (different endpoint, different aggregation)
-    let wormholeChainTvl = null;
     let tvlDrop = "";
     try {
         const r2 = await fetch("https://api.llama.fi/protocol/wormhole", { signal: AbortSignal.timeout(8000) });
         const d2 = (await r2.json());
-        // Sum current chain TVLs as independent validation
         const chainTvls = d2?.currentChainTvls ?? {};
-        wormholeChainTvl = Object.values(chainTvls).reduce((a, b) => a + (typeof b === "number" ? b : 0), 0);
-        // Flag a >30% drop between the two aggregation methods (potential exploit signal)
+        const wormholeChainTvl = Object.values(chainTvls).reduce((a, b) => a + (typeof b === "number" ? b : 0), 0);
         const wormholeSlug = tvls.find((t) => t.startsWith("wormhole="));
         if (wormholeSlug && wormholeChainTvl > 0) {
             const slugTvl = parseFloat(wormholeSlug.replace(/.*=\$/, "").replace("B", "")) * 1e9;
             const dropPct = ((slugTvl - wormholeChainTvl) / Math.max(slugTvl, wormholeChainTvl)) * 100;
             if (Math.abs(dropPct) > 30)
-                tvlDrop = ` ⚠ wormhole_tvl_discrepancy=${dropPct.toFixed(0)}%`;
+                tvlDrop = ` WARN:tvl_discrepancy=${dropPct.toFixed(0)}%`;
         }
     }
     catch { /* ignore */ }
     return {
         tvlMillions,
-        sources: `DeFiLlama bridges: ${tvls.join(" ")} total=$${(totalTvl / 1e9).toFixed(2)}B${tvlDrop}`,
+        sources: `DeFiLlama: ${tvls.join(" ")} total=$${(totalTvl / 1e9).toFixed(2)}B${tvlDrop}`,
+        rawPayload,
     };
 }
 // ── Oracle Jobs ───────────────────────────────────────────────────────────
 async function runEarthquakeJob() {
-    const { magnitude, place, sources } = await fetchEarthquake();
-    const onChainValue = Math.round(magnitude * 100); // M6.5 → 650
-    const { approved, reasoning } = await groqValidate(`Earthquake oracle: ${sources}. Is the top magnitude M${magnitude.toFixed(1)} at "${place}" a plausible real-world reading and do both data sources agree?`);
-    if (!approved) {
-        console.warn(`[oracle:earthquake] BLOCKED by AI validator: ${reasoning}`);
-        return;
-    }
-    const tx = await postReport(new web3_js_1.PublicKey(EARTHQUAKE_POOL), onChainValue, scopeHash(SCOPE_SEEDS.earthquake), `EQ M${magnitude.toFixed(1)} ${place.slice(0, 40)} | ${reasoning}`);
-    console.log(`[oracle:earthquake] M${magnitude.toFixed(1)} value=${onChainValue} tx=${tx.slice(0, 16)}…`);
+    const { magnitude, place, sources, rawPayload } = await fetchEarthquake();
+    const onChainValue = Math.round(magnitude * 100);
+    const tx = await postReport(new web3_js_1.PublicKey(EARTHQUAKE_POOL), onChainValue, scopeHash(SCOPE_SEEDS.earthquake), `EQ M${magnitude.toFixed(1)} ${place.slice(0, 60)}`, rawPayload);
+    console.log(`[oracle:earthquake] M${magnitude.toFixed(1)} value=${onChainValue} tx=${tx.slice(0, 16)}… | ${sources}`);
 }
 async function runFloodJob() {
-    const { gaugeFt, siteName, sources } = await fetchFlood();
-    const onChainValue = Math.round(gaugeFt * 10); // 28.3ft → 283
-    const { approved, reasoning } = await groqValidate(`Flood oracle: ${sources}. Is gauge height ${gaugeFt.toFixed(1)} ft at "${siteName}" plausible?`);
-    if (!approved) {
-        console.warn(`[oracle:flood] BLOCKED by AI validator: ${reasoning}`);
-        return;
-    }
-    const tx = await postReport(new web3_js_1.PublicKey(FLOOD_POOL), onChainValue, scopeHash(SCOPE_SEEDS.flood), `Flood ${gaugeFt.toFixed(1)}ft ${siteName.slice(0, 30)} | ${reasoning}`);
-    console.log(`[oracle:flood] ${gaugeFt.toFixed(1)}ft value=${onChainValue} tx=${tx.slice(0, 16)}…`);
+    const { gaugeFt, siteName, sources, rawPayload } = await fetchFlood();
+    const onChainValue = Math.round(gaugeFt * 10);
+    const tx = await postReport(new web3_js_1.PublicKey(FLOOD_POOL), onChainValue, scopeHash(SCOPE_SEEDS.flood), `Flood ${gaugeFt.toFixed(1)}ft ${siteName.slice(0, 50)}`, rawPayload);
+    console.log(`[oracle:flood] ${gaugeFt.toFixed(1)}ft value=${onChainValue} tx=${tx.slice(0, 16)}… | ${sources}`);
 }
 async function runCropJob() {
-    const { score, sources } = await fetchCropComposite();
-    const { approved, reasoning } = await groqValidate(`Crop multi-factor oracle: ${sources}. Is this composite crop stress score plausible?`);
-    if (!approved) {
-        console.warn(`[oracle:crop] BLOCKED by AI validator: ${reasoning}`);
-        return;
-    }
-    const tx = await postReport(new web3_js_1.PublicKey(CROP_POOL), score, scopeHash(SCOPE_SEEDS.crop), `Crop score ${score}/10000 | ${reasoning}`);
-    console.log(`[oracle:crop] score=${score}/10000 tx=${tx.slice(0, 16)}…`);
+    const { score, sources, rawPayload } = await fetchCropComposite();
+    const tx = await postReport(new web3_js_1.PublicKey(CROP_POOL), score, scopeHash(SCOPE_SEEDS.crop), `Crop ${score}/10000 ${sources.slice(0, 70)}`, rawPayload);
+    console.log(`[oracle:crop] score=${score}/10000 tx=${tx.slice(0, 16)}… | ${sources}`);
 }
 async function runHurricaneJob() {
-    const { windKnots, name, sources } = await fetchHurricane();
-    const { approved, reasoning } = await groqValidate(`Hurricane oracle: ${sources}. Is this tropical weather reading plausible?`);
-    if (!approved) {
-        console.warn(`[oracle:hurricane] BLOCKED by AI validator: ${reasoning}`);
-        return;
-    }
-    const tx = await postReport(new web3_js_1.PublicKey(HURRICANE_POOL), windKnots, scopeHash(SCOPE_SEEDS.hurricane), `${name} ${windKnots}kt | ${reasoning}`);
-    console.log(`[oracle:hurricane] ${name} ${windKnots}kt tx=${tx.slice(0, 16)}…`);
+    const { windKnots, name, sources, rawPayload } = await fetchHurricane();
+    const tx = await postReport(new web3_js_1.PublicKey(HURRICANE_POOL), windKnots, scopeHash(SCOPE_SEEDS.hurricane), `Hurricane ${name} ${windKnots}kt`, rawPayload);
+    console.log(`[oracle:hurricane] ${name} ${windKnots}kt tx=${tx.slice(0, 16)}… | ${sources}`);
 }
 async function runStablecoinJob() {
-    const { usdcBps, usdtBps, sources } = await fetchStablecoinPrice();
-    // Report the lower of USDC/USDT (worst-case depeg)
+    const { usdcBps, usdtBps, sources, rawPayload } = await fetchStablecoinPrice();
     const onChainValue = Math.min(usdcBps, usdtBps);
-    const { approved, reasoning } = await groqValidate(`Stablecoin oracle: ${sources}. Are these stablecoin prices plausible?`);
-    if (!approved) {
-        console.warn(`[oracle:stablecoin] BLOCKED by AI validator: ${reasoning}`);
-        return;
-    }
-    const tx = await postReport(new web3_js_1.PublicKey(USDC_POOL), onChainValue, scopeHash(SCOPE_SEEDS.stablecoin), `USDC ${(usdcBps / 100).toFixed(2)}¢ USDT ${(usdtBps / 100).toFixed(2)}¢ | ${reasoning}`);
-    console.log(`[oracle:stablecoin] USDC=${usdcBps}bps USDT=${usdtBps}bps tx=${tx.slice(0, 16)}…`);
+    const tx = await postReport(new web3_js_1.PublicKey(USDC_POOL), onChainValue, scopeHash(SCOPE_SEEDS.stablecoin), `USDC ${(usdcBps / 100).toFixed(2)}c USDT ${(usdtBps / 100).toFixed(2)}c`, rawPayload);
+    console.log(`[oracle:stablecoin] USDC=${usdcBps}bps USDT=${usdtBps}bps tx=${tx.slice(0, 16)}… | ${sources}`);
 }
 async function runBridgeJob() {
-    const { tvlMillions, sources } = await fetchBridgeTvl();
-    // Skip posting if all fetches failed — zero TVL on outage would false-trigger policies
+    const { tvlMillions, sources, rawPayload } = await fetchBridgeTvl();
+    // Skip posting if all fetches failed — zero TVL on data outage would false-trigger policies
     if (tvlMillions === 0) {
-        console.warn("[oracle:bridge] SKIPPED: tvlMillions=0 (all DeFiLlama fetches failed — data outage guard)");
+        console.warn("[oracle:bridge] SKIPPED: tvlMillions=0 — all DeFiLlama fetches failed (data outage guard)");
         return;
     }
-    const { approved, reasoning } = await groqValidate(`Bridge TVL oracle: ${sources}. Is the combined bridge TVL plausible (no active mass exploit)?`);
-    if (!approved) {
-        console.warn(`[oracle:bridge] BLOCKED by AI validator: ${reasoning}`);
-        return;
-    }
-    const tx = await postReport(new web3_js_1.PublicKey(BRIDGE_POOL), tvlMillions, scopeHash(SCOPE_SEEDS.bridge), `Bridges $${(tvlMillions / 1000).toFixed(1)}B | ${reasoning}`);
-    console.log(`[oracle:bridge] tvl=$${(tvlMillions / 1000).toFixed(1)}B value=${tvlMillions}M tx=${tx.slice(0, 16)}…`);
+    const tx = await postReport(new web3_js_1.PublicKey(BRIDGE_POOL), tvlMillions, scopeHash(SCOPE_SEEDS.bridge), `Bridges $${(tvlMillions / 1000).toFixed(1)}B`, rawPayload);
+    console.log(`[oracle:bridge] tvl=$${(tvlMillions / 1000).toFixed(1)}B value=${tvlMillions}M tx=${tx.slice(0, 16)}… | ${sources}`);
 }
 // ── Scheduler ─────────────────────────────────────────────────────────────
 async function runAllJobs() {

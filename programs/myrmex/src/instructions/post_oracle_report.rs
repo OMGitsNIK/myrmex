@@ -38,6 +38,13 @@ pub fn handler(
     let clock = Clock::get()?;
     let report = &mut ctx.accounts.oracle_report;
 
+    // Enforce monotonicity: each new report must be strictly newer than the
+    // previous one. This prevents backdating and silent data replacement.
+    require!(
+        clock.unix_timestamp > report.reported_at,
+        MyrmexError::OracleReportNotNewer
+    );
+
     report.authority = ctx.accounts.oracle_authority.key();
     report.pool = ctx.accounts.pool.key();
     report.scope_hash = scope_hash;

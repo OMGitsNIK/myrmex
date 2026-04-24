@@ -30,7 +30,12 @@ pub fn handler(
     min_premium_bps: u64,
     max_coverage_bps: u64,
 ) -> Result<()> {
-    require!(min_premium_bps <= 10_000, MyrmexError::InvalidConfig);
+    // Enforce a protocol-level minimum floor of 50 bps (0.5%) to prevent
+    // zero-premium policies that drain the pool.
+    require!(
+        (50..=10_000).contains(&min_premium_bps),
+        MyrmexError::InvalidConfig
+    );
     require!(max_coverage_bps > 0 && max_coverage_bps <= 10_000, MyrmexError::InvalidConfig);
 
     let config = &mut ctx.accounts.pool_config;

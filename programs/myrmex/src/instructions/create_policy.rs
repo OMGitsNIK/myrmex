@@ -86,15 +86,22 @@ pub fn handler(
         MyrmexError::Unauthorized
     );
 
+    // comparison must be a known operator: 0=GT, 1=LT, 2=EQ
+    require!(trigger_condition.comparison <= 2, MyrmexError::InvalidConfig);
+
     // Oracle pubkey must be the pool's authoritative oracle — not the user's wallet
     require!(
         trigger_condition.oracle_pubkey == pool_config.oracle_authority,
         MyrmexError::WrongOracle
     );
 
-    // Premium must meet the pool's minimum floor (min_premium_bps of payout)
-    let min_premium = payout_amount
+    // Premium must meet the pool's minimum floor (min_premium_bps of payout).
+    // Ceiling division prevents rounding down to below the true minimum.
+    let numerator = payout_amount
         .checked_mul(pool_config.min_premium_bps)
+        .ok_or(error!(MyrmexError::MathOverflow))?;
+    let min_premium = numerator
+        .checked_add(9_999)
         .ok_or(error!(MyrmexError::MathOverflow))?
         .checked_div(10_000)
         .ok_or(error!(MyrmexError::MathOverflow))?;
@@ -148,6 +155,11 @@ pub fn handler(
     pool.total_locked = pool
         .total_locked
         .checked_add(payout_amount)
+        .ok_or(error!(MyrmexError::MathOverflow))?;
+    // Premium is earned yield — add to total_liquidity so all LPs share it pro-rata.
+    pool.total_liquidity = pool
+        .total_liquidity
+        .checked_add(premium_amount)
         .ok_or(error!(MyrmexError::MathOverflow))?;
     pool.premium_accrued = pool
         .premium_accrued

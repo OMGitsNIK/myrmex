@@ -22,15 +22,24 @@ pub struct UpdatePoolConfig<'info> {
 
 pub fn handler(
     ctx: Context<UpdatePoolConfig>,
-    oracle_authority: Pubkey,
     min_premium_bps: u64,
     max_coverage_bps: u64,
 ) -> Result<()> {
-    require!(min_premium_bps <= 10_000, MyrmexError::InvalidConfig);
-    require!(max_coverage_bps > 0 && max_coverage_bps <= 10_000, MyrmexError::InvalidConfig);
+    require!(
+        (50..=10_000).contains(&min_premium_bps),
+        MyrmexError::InvalidConfig
+    );
+    require!(
+        max_coverage_bps > 0 && max_coverage_bps <= 10_000,
+        MyrmexError::InvalidConfig
+    );
+    // min_premium_bps can only increase — lowering it is a rug vector.
+    require!(
+        min_premium_bps >= ctx.accounts.pool_config.min_premium_bps,
+        MyrmexError::InvalidConfig
+    );
 
     let config = &mut ctx.accounts.pool_config;
-    config.oracle_authority = oracle_authority;
     config.min_premium_bps = min_premium_bps;
     config.max_coverage_bps = max_coverage_bps;
 

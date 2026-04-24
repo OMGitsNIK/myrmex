@@ -14,13 +14,15 @@
   "type": "commonjs",
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",
+    "@noble/ed25519": "^3.1.0",
     "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4",
     "better-sqlite3": "^12.9.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "groq-sdk": "^1.1.2",
+    "express-rate-limit": "^8.4.0",
+    "helmet": "^8.1.0",
     "node-cron": "^4.2.1"
   },
   "devDependencies": {

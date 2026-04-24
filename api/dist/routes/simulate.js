@@ -40,7 +40,12 @@ const spl_token_1 = require("@solana/spl-token");
 const web3_js_1 = require("@solana/web3.js");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
+const ed25519_1 = require("@noble/curves/ed25519");
 const anchor_service_1 = require("../services/anchor.service");
+// Message format: "myrmex-simulate:<policy>:<oracle_value>"
+// Binding the oracle value prevents a signed ownership proof from being
+// replayed at a different trigger value than the user intended.
+const SIMULATE_MESSAGE_PREFIX = "myrmex-simulate:";
 const router = (0, express_1.Router)();
 exports.simulateRouter = router;
 const PROGRAM_ID = new web3_js_1.PublicKey(process.env.PROGRAM_ID || "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan");
@@ -88,16 +93,27 @@ router.post("/", async (req, res) => {
         return res.status(403).json({ error: "simulate-trigger is disabled in production" });
     }
     try {
-        const { policy: policyPubkeyStr, oracle_value, policyholder: callerStr } = req.body;
+        const { policy: policyPubkeyStr, oracle_value, signature, message } = req.body;
+        if (!signature || !message) {
+            return res.status(400).json({ error: "signature and message are required" });
+        }
         const { program, provider } = (0, anchor_service_1.getAnchorProgram)();
         const policyPk = new web3_js_1.PublicKey(policyPubkeyStr);
         const policyAccount = (await program.account.policyVault.fetch(policyPk));
-        // Require caller to identify themselves as the policyholder
+        // Verify the caller signed the expected message with the policyholder's key
         const onChainPolicyholder = policyAccount.policyholder.toBase58();
-        if (!callerStr || callerStr !== onChainPolicyholder) {
-            return res.status(403).json({
-                error: "Only the policyholder can simulate a trigger for this policy",
-            });
+        // Message binds the policy pubkey AND the oracle value — prevents replaying a
+        // legitimate ownership proof at a different trigger value.
+        const expectedMessage = new TextEncoder().encode(`${SIMULATE_MESSAGE_PREFIX}${policyPubkeyStr}:${oracle_value}`);
+        const msgBytes = new Uint8Array(message);
+        const sigBytes = new Uint8Array(signature);
+        const pkBytes = new web3_js_1.PublicKey(onChainPolicyholder).toBytes();
+        if (Buffer.from(msgBytes).toString() !== Buffer.from(expectedMessage).toString()) {
+            return res.status(403).json({ error: "Invalid message content" });
+        }
+        const valid = ed25519_1.ed25519.verify(sigBytes, msgBytes, pkBytes);
+        if (!valid) {
+            return res.status(403).json({ error: "Signature verification failed — only the policyholder can simulate" });
         }
         const poolPk = policyAccount.pool;
         const poolAccount = (await program.account.riskPool.fetch(poolPk));

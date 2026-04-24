@@ -8,6 +8,90 @@
   },
   "instructions": [
     {
+      "name": "apply_oracle_authority",
+      "discriminator": [
+        23,
+        80,
+        252,
+        182,
+        76,
+        236,
+        92,
+        106
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool"
+        },
+        {
+          "name": "pool_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "proposal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  97,
+                  99,
+                  108,
+                  101,
+                  95,
+                  112,
+                  114,
+                  111,
+                  112,
+                  111,
+                  115,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "cast_vote",
       "discriminator": [
         20,
@@ -22,10 +106,8 @@
       "accounts": [
         {
           "name": "voter",
+          "writable": true,
           "signer": true
-        },
-        {
-          "name": "stake_account"
         },
         {
           "name": "proposal",
@@ -48,6 +130,42 @@
               {
                 "kind": "arg",
                 "path": "proposal_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vote_record",
+          "docs": [
+            "One-time-use PDA proving this (voter, proposal) pair hasn't voted yet.",
+            "`init` fails if it already exists — this is the double-vote guard."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  95,
+                  114,
+                  101,
+                  99,
+                  111,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "proposal"
+              },
+              {
+                "kind": "account",
+                "path": "voter"
               }
             ]
           }
@@ -261,6 +379,83 @@
         },
         {
           "name": "nonce",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "create_proposal",
+      "discriminator": [
+        132,
+        116,
+        68,
+        174,
+        216,
+        160,
+        198,
+        22
+      ],
+      "accounts": [
+        {
+          "name": "proposer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "proposal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  112,
+                  111,
+                  115,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "proposal_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "proposal_id",
+          "type": "u64"
+        },
+        {
+          "name": "title",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        },
+        {
+          "name": "description",
+          "type": {
+            "array": [
+              "u8",
+              128
+            ]
+          }
+        },
+        {
+          "name": "voting_duration_secs",
           "type": "i64"
         }
       ]
@@ -860,6 +1055,98 @@
       ]
     },
     {
+      "name": "propose_oracle_authority",
+      "discriminator": [
+        146,
+        109,
+        205,
+        24,
+        129,
+        202,
+        217,
+        36
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool"
+        },
+        {
+          "name": "pool_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "proposal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  97,
+                  99,
+                  108,
+                  101,
+                  95,
+                  112,
+                  114,
+                  111,
+                  112,
+                  111,
+                  115,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "new_oracle",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "stake_myr",
       "discriminator": [
         45,
@@ -1334,10 +1621,6 @@
       ],
       "args": [
         {
-          "name": "oracle_authority",
-          "type": "pubkey"
-        },
-        {
           "name": "min_premium_bps",
           "type": "u64"
         },
@@ -1594,6 +1877,19 @@
       ]
     },
     {
+      "name": "OracleAuthorityProposal",
+      "discriminator": [
+        241,
+        184,
+        105,
+        231,
+        209,
+        138,
+        101,
+        182
+      ]
+    },
+    {
       "name": "OracleReport",
       "discriminator": [
         72,
@@ -1656,6 +1952,19 @@
         189,
         192,
         255
+      ]
+    },
+    {
+      "name": "VoteRecord",
+      "discriminator": [
+        112,
+        9,
+        123,
+        165,
+        234,
+        9,
+        157,
+        167
       ]
     }
   ],
@@ -1821,6 +2130,11 @@
       "code": 6018,
       "name": "InvalidConfig",
       "msg": "Invalid configuration parameter"
+    },
+    {
+      "code": 6019,
+      "name": "TimelockNotExpired",
+      "msg": "Oracle authority timelock has not expired yet"
     }
   ],
   "types": [
@@ -1836,6 +2150,15 @@
           {
             "name": "proposer",
             "type": "pubkey"
+          },
+          {
+            "name": "title",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
           },
           {
             "name": "description",
@@ -1893,6 +2216,34 @@
           {
             "name": "lp_tokens_burned",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OracleAuthorityProposal",
+      "docs": [
+        "Pending oracle authority change. Created by `propose_oracle_authority`,",
+        "applied by `apply_oracle_authority` after ORACLE_TIMELOCK_SECS."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposed_oracle",
+            "type": "pubkey"
+          },
+          {
+            "name": "effective_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
           }
         ]
       }
@@ -2277,6 +2628,34 @@
           },
           {
             "name": "comparison",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VoteRecord",
+      "docs": [
+        "One account per (voter, proposal) pair — prevents double voting.",
+        "Created by `cast_vote`; its existence proves the voter already voted."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "voter",
+            "type": "pubkey"
+          },
+          {
+            "name": "vote",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
             "type": "u8"
           }
         ]

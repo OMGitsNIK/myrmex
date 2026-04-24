@@ -297,6 +297,10 @@ export default function AdminPage() {
 
       {/* Pool Config Update Panel */}
       <UpdatePoolConfigPanel pools={pools} />
+
+      {/* Oracle Authority Timelock Panels */}
+      <ProposeOracleAuthorityPanel pools={pools} />
+      <ApplyOracleAuthorityPanel pools={pools} />
     </div>
   );
 }
@@ -306,7 +310,6 @@ function UpdatePoolConfigPanel({ pools }: { pools: PoolResponse[] }) {
   const PROGRAM_ID = new PublicKey("9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan");
 
   const [selectedPool, setSelectedPool] = useState("");
-  const [oracleAuthority, setOracleAuthority] = useState("");
   const [minPremiumBps, setMinPremiumBps] = useState("500");
   const [maxCoverageBps, setMaxCoverageBps] = useState("8000");
   const [submitting, setSubmitting] = useState(false);
@@ -314,8 +317,6 @@ function UpdatePoolConfigPanel({ pools }: { pools: PoolResponse[] }) {
   const handleUpdate = async () => {
     if (!program || !wallet) { toast.error("Connect pool authority wallet"); return; }
     if (!selectedPool) { toast.error("Select a pool"); return; }
-    let oraclePk: PublicKey;
-    try { oraclePk = new PublicKey(oracleAuthority); } catch { toast.error("Invalid oracle authority pubkey"); return; }
     const minBps = parseInt(minPremiumBps);
     const maxBps = parseInt(maxCoverageBps);
     if (!isFinite(minBps) || minBps < 0 || minBps > 10000) { toast.error("min_premium_bps must be 0–10000"); return; }
@@ -330,7 +331,7 @@ function UpdatePoolConfigPanel({ pools }: { pools: PoolResponse[] }) {
       );
       const { BN } = await import("@coral-xyz/anchor");
       await (program as any).methods
-        .updatePoolConfig(oraclePk, new BN(minBps), new BN(maxBps))
+        .updatePoolConfig(new BN(minBps), new BN(maxBps))
         .accounts({ authority: wallet.publicKey, pool: poolPk, poolConfig: poolConfigPda })
         .rpc();
       toast.success("pool_config updated on-chain");
@@ -346,7 +347,7 @@ function UpdatePoolConfigPanel({ pools }: { pools: PoolResponse[] }) {
       <div>
         <h2 className="font-semibold text-white">Update Pool Config</h2>
         <p className="text-xs text-gray-500 mt-1">
-          Rotate oracle authority or adjust premium floor / coverage cap. Requires pool authority wallet.
+          Adjust premium floor / coverage cap. Requires pool authority wallet.
         </p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -364,16 +365,6 @@ function UpdatePoolConfigPanel({ pools }: { pools: PoolResponse[] }) {
               </option>
             ))}
           </select>
-        </label>
-        <label className="space-y-1">
-          <span className="text-xs text-gray-500">New Oracle Authority (pubkey)</span>
-          <input
-            type="text"
-            value={oracleAuthority}
-            onChange={(e) => setOracleAuthority(e.target.value)}
-            placeholder="GeBW6LUY…"
-            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white text-sm font-mono focus:border-[var(--accent)]/50 outline-none"
-          />
         </label>
         <label className="space-y-1">
           <span className="text-xs text-gray-500">Min Premium bps (0–10000)</span>
@@ -406,6 +397,172 @@ function UpdatePoolConfigPanel({ pools }: { pools: PoolResponse[] }) {
         {submitting ? "Updating…" : "Update Pool Config"}
       </button>
       {!wallet && <p className="text-xs text-gray-600">Connect the pool authority wallet to update config.</p>}
+    </div>
+  );
+}
+
+function ProposeOracleAuthorityPanel({ pools }: { pools: PoolResponse[] }) {
+  const { program, wallet } = useAnchorProgram();
+  const PROGRAM_ID = new PublicKey("9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan");
+
+  const [selectedPool, setSelectedPool] = useState("");
+  const [newOracle, setNewOracle] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handlePropose = async () => {
+    if (!program || !wallet) { toast.error("Connect pool authority wallet"); return; }
+    if (!selectedPool) { toast.error("Select a pool"); return; }
+    let oraclePk: PublicKey;
+    try { oraclePk = new PublicKey(newOracle); } catch { toast.error("Invalid oracle pubkey"); return; }
+
+    setSubmitting(true);
+    try {
+      const poolPk = new PublicKey(selectedPool);
+      const [poolConfigPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("pool_config"), poolPk.toBuffer()],
+        PROGRAM_ID
+      );
+      const [proposalPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("oracle_proposal"), poolPk.toBuffer()],
+        PROGRAM_ID
+      );
+      await (program as any).methods
+        .proposeOracleAuthority(oraclePk)
+        .accounts({
+          authority: wallet.publicKey,
+          pool: poolPk,
+          poolConfig: poolConfigPda,
+          proposal: proposalPda,
+          systemProgram: "11111111111111111111111111111111",
+        })
+        .rpc();
+      toast.success("Oracle authority change proposed — takes effect in 1 hour");
+    } catch (e: unknown) {
+      toast.error("Proposal failed", { description: (e as Error).message });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="card p-6 space-y-5">
+      <div>
+        <h2 className="font-semibold text-white">Propose Oracle Authority Change</h2>
+        <p className="text-xs text-gray-500 mt-1">
+          Initiates a 1-hour timelock before the new oracle authority takes effect. Anyone can cancel by monitoring the proposal PDA.
+        </p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <label className="space-y-1">
+          <span className="text-xs text-gray-500">Pool</span>
+          <select
+            value={selectedPool}
+            onChange={(e) => setSelectedPool(e.target.value)}
+            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white text-sm focus:border-[var(--accent)]/50 outline-none"
+          >
+            <option value="">— select pool —</option>
+            {pools.map((p) => (
+              <option key={p.pubkey} value={p.pubkey}>
+                {COVERAGE_NAMES[p.poolType] ?? `Type ${p.poolType}`} — {p.pubkey.slice(0, 8)}…
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-1">
+          <span className="text-xs text-gray-500">New Oracle Authority (pubkey)</span>
+          <input
+            type="text"
+            value={newOracle}
+            onChange={(e) => setNewOracle(e.target.value)}
+            placeholder="GeBW6LUY…"
+            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white text-sm font-mono focus:border-[var(--accent)]/50 outline-none"
+          />
+        </label>
+      </div>
+      <button
+        onClick={handlePropose}
+        disabled={submitting || !wallet}
+        className="bg-yellow-600 hover:opacity-90 disabled:opacity-40 text-black font-bold px-6 py-2 rounded-lg text-sm transition-opacity"
+      >
+        {submitting ? "Proposing…" : "Propose Oracle Change (1-hr timelock)"}
+      </button>
+      {!wallet && <p className="text-xs text-gray-600">Connect the pool authority wallet to propose.</p>}
+    </div>
+  );
+}
+
+function ApplyOracleAuthorityPanel({ pools }: { pools: PoolResponse[] }) {
+  const { program, wallet } = useAnchorProgram();
+  const PROGRAM_ID = new PublicKey("9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan");
+
+  const [selectedPool, setSelectedPool] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleApply = async () => {
+    if (!program || !wallet) { toast.error("Connect pool authority wallet"); return; }
+    if (!selectedPool) { toast.error("Select a pool"); return; }
+
+    setSubmitting(true);
+    try {
+      const poolPk = new PublicKey(selectedPool);
+      const [poolConfigPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("pool_config"), poolPk.toBuffer()],
+        PROGRAM_ID
+      );
+      const [proposalPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("oracle_proposal"), poolPk.toBuffer()],
+        PROGRAM_ID
+      );
+      await (program as any).methods
+        .applyOracleAuthority()
+        .accounts({
+          authority: wallet.publicKey,
+          pool: poolPk,
+          poolConfig: poolConfigPda,
+          proposal: proposalPda,
+        })
+        .rpc();
+      toast.success("Oracle authority applied — proposal account closed");
+    } catch (e: unknown) {
+      toast.error("Apply failed", { description: (e as Error).message });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="card p-6 space-y-5">
+      <div>
+        <h2 className="font-semibold text-white">Apply Oracle Authority Change</h2>
+        <p className="text-xs text-gray-500 mt-1">
+          Applies a previously proposed oracle authority after the 1-hour timelock has expired.
+        </p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <label className="space-y-1">
+          <span className="text-xs text-gray-500">Pool</span>
+          <select
+            value={selectedPool}
+            onChange={(e) => setSelectedPool(e.target.value)}
+            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white text-sm focus:border-[var(--accent)]/50 outline-none"
+          >
+            <option value="">— select pool —</option>
+            {pools.map((p) => (
+              <option key={p.pubkey} value={p.pubkey}>
+                {COVERAGE_NAMES[p.poolType] ?? `Type ${p.poolType}`} — {p.pubkey.slice(0, 8)}…
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <button
+        onClick={handleApply}
+        disabled={submitting || !wallet}
+        className="bg-green-700 hover:opacity-90 disabled:opacity-40 text-white font-bold px-6 py-2 rounded-lg text-sm transition-opacity"
+      >
+        {submitting ? "Applying…" : "Apply Oracle Change (after timelock)"}
+      </button>
+      {!wallet && <p className="text-xs text-gray-600">Connect the pool authority wallet to apply.</p>}
     </div>
   );
 }

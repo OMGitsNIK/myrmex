@@ -80,15 +80,39 @@ pub mod myrmex {
 
     pub fn update_pool_config(
         ctx: Context<UpdatePoolConfig>,
-        oracle_authority: Pubkey,
         min_premium_bps: u64,
         max_coverage_bps: u64,
     ) -> Result<()> {
-        instructions::update_pool_config::handler(ctx, oracle_authority, min_premium_bps, max_coverage_bps)
+        instructions::update_pool_config::handler(ctx, min_premium_bps, max_coverage_bps)
+    }
+
+    pub fn propose_oracle_authority(
+        ctx: Context<ProposeOracleAuthority>,
+        new_oracle: Pubkey,
+    ) -> Result<()> {
+        instructions::propose_oracle_authority::handler(ctx, new_oracle)
+    }
+
+    pub fn apply_oracle_authority(ctx: Context<ApplyOracleAuthority>) -> Result<()> {
+        instructions::apply_oracle_authority::handler(ctx)
     }
 
     pub fn stake_myr(ctx: Context<StakeMyr>, amount: u64) -> Result<()> {
         instructions::stake_myr::handler(ctx, amount)
+    }
+
+    pub fn unstake_myr(ctx: Context<UnstakeMyr>, amount: u64) -> Result<()> {
+        instructions::unstake_myr::handler(ctx, amount)
+    }
+
+    pub fn create_proposal(
+        ctx: Context<CreateProposal>,
+        proposal_id: u64,
+        title: [u8; 64],
+        description: [u8; 128],
+        voting_duration_secs: i64,
+    ) -> Result<()> {
+        instructions::create_proposal::handler(ctx, proposal_id, title, description, voting_duration_secs)
     }
 
     pub fn cast_vote(ctx: Context<CastVote>, proposal_id: u64, vote: bool) -> Result<()> {

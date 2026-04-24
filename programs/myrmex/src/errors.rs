@@ -40,4 +40,10 @@ pub enum MyrmexError {
     OracleScopeMismatch,
     #[msg("Invalid configuration parameter")]
     InvalidConfig,
+    #[msg("Oracle authority timelock has not expired yet")]
+    TimelockNotExpired,
+    #[msg("Oracle report must have a later timestamp than the previous report")]
+    OracleReportNotNewer,
+    #[msg("Stake lock period has not yet expired")]
+    LockNotExpired,
 }
