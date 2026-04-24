@@ -23,7 +23,8 @@ export function explorerUrl(tx: string): string {
 }
 
 export const PRICING_API =
-  process.env.NEXT_PUBLIC_PRICING_API || "http://localhost:8001";
+  process.env.NEXT_PUBLIC_PRICING_API || "http://localhost:8000";
+
 
 export const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";

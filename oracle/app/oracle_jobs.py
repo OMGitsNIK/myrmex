@@ -1,6 +1,17 @@
 """
 Scheduled oracle jobs — one per coverage type.
-Each job: fetch data → Claude verification → post on-chain if triggered.
+
+Each job fetches real-world data from a SINGLE external provider, runs an
+optional Claude AI plausibility check, then posts an OracleReport on-chain
+regardless of whether the trigger condition is met (the on-chain program
+decides payout eligibility at claim time).
+
+DATA SOURCE SUMMARY (demo build)
+─────────────────────────────────
+  crop    — Open-Meteo (precipitation_sum, single provider)
+  defi    — DeFiLlama TVL endpoint (single provider);
+             baseline_tvl = current × 1.0 (no historic comparison)
+  flight  — Mock only (MOCK_FLIGHT_DELAY_MINUTES env var)
 """
 import logging
 import hashlib
@@ -16,7 +27,10 @@ def _scope(seed: str) -> bytes:
 
 
 async def run_crop_drought_job():
-    """Fetch rainfall data, verify with Claude, post report to crop pool."""
+    """Fetch rainfall data (Open-Meteo, single provider), verify with Claude, post report to crop pool.
+
+    DATA SOURCE: Open-Meteo /forecast?daily=precipitation_sum (sole source, no cross-check).
+    """
     if not CROP_POOL:
         logger.warning("CROP_POOL not configured, skipping crop job")
         return
@@ -53,7 +67,12 @@ async def run_crop_drought_job():
 
 
 async def run_defi_hack_job():
-    """Fetch DeFi TVL data, verify with Claude, post report to DeFi pool."""
+    """Fetch DeFi TVL (DeFiLlama, single provider), verify with Claude, post report to DeFi pool.
+
+    DATA SOURCE: DeFiLlama /tvl/{protocol} (sole source, no cross-check).
+    NOTE: baseline_tvl is set to current_tvl × 1.0 — no historical high-water mark
+    is stored, so drop detection only works across consecutive poll intervals.
+    """
     if not DEFI_POOL:
         logger.warning("DEFI_POOL not configured, skipping defi job")
         return
@@ -62,7 +81,7 @@ async def run_defi_hack_job():
         current_tvl = await data_sources.get_defi_tvl_usd()
         # Use 7-day cached baseline or fall back to current * 1.5 for first run
         # In production this would be stored in a DB
-        baseline_tvl = current_tvl * 1.0  # placeholder — see TODO below
+        baseline_tvl = current_tvl * 1.0  # No stored historic baseline — same-tick comparison only
         drop_threshold_pct = 20.0  # 20% TVL drop = hack signal
 
         verification = ai_verifier.verify_defi_hack(
@@ -94,7 +113,11 @@ async def run_defi_hack_job():
 
 
 async def run_flight_job():
-    """Fetch flight delay data, verify with Claude, post report to flight pool."""
+    """Fetch flight delay data (MOCK ONLY), verify with Claude, post report to flight pool.
+
+    DATA SOURCE: Mock — reads MOCK_FLIGHT_DELAY_MINUTES env var (default 0).
+    No live aviation API is connected in this build.
+    """
     if not FLIGHT_POOL:
         logger.warning("FLIGHT_POOL not configured, skipping flight job")
         return

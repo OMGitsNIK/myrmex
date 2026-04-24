@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useAnchorProgram } from "@/hooks/useAnchorProgram";
 import * as anchor from "@coral-xyz/anchor";
 import { toast } from "sonner";
-import { explorerUrl } from "@/lib/constants";
+
 
 interface Proposal {
   id: number;
@@ -47,7 +47,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     votesAgainst: 44,
     endsAt: new Date(Date.now() - 2 * 86400_000),
   },
-];
+]; // NOTE: proposals are seeded locally — not fetched from on-chain storage.
 
 export default function GovernancePage() {
   const { program, wallet } = useAnchorProgram();
@@ -105,9 +105,13 @@ export default function GovernancePage() {
             stakeAccount: stakeAccountPda,
           })
           .rpc();
+        // Only update local vote state on confirmed on-chain success
+        setVotes((prev) => ({ ...prev, [proposalId]: side }));
+        toast.success(`Voted ${side === "for" ? "✓ For" : "✗ Against"} Proposal #${proposalId}`);
+      } else {
+        // No program available — cannot cast a real vote
+        toast.error("Governance is in demo mode — on-chain voting not available without a connected program.");
       }
-      setVotes((prev) => ({ ...prev, [proposalId]: side }));
-      toast.success(`Voted ${side === "for" ? "✓ For" : "✗ Against"} Proposal #${proposalId}`);
     } catch (e: unknown) {
       const err = e as Error;
       if (err.message?.includes("Account does not exist") || err.message?.includes("not found")) {
@@ -115,6 +119,7 @@ export default function GovernancePage() {
       } else {
         toast.error("Vote failed", { description: err.message });
       }
+      // Do NOT update vote state — the on-chain transaction did not succeed
     } finally {
       setVoting(null);
     }
@@ -136,6 +141,21 @@ export default function GovernancePage() {
           Stake MYR tokens to vote on protocol parameters, new pool types, and oracle configuration.
           All changes are enforced on-chain after quorum is reached.
         </p>
+      </div>
+
+      {/* Demo Mode banner */}
+      <div className="flex items-start gap-3 p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-sm">
+        <span className="text-yellow-400 text-lg leading-none mt-0.5">⚠</span>
+        <div className="space-y-1">
+          <p className="text-yellow-400 font-semibold">Governance Demo Mode</p>
+          <p className="text-yellow-500/80">
+            Proposals below are seeded locally and are <strong>not</strong> stored on-chain.
+            The <code className="text-yellow-400">stake_myr</code> and{" "}
+            <code className="text-yellow-400">cast_vote</code> instructions are wired to devnet but
+            require a fully initialised stake account. Votes are only recorded in UI state
+            when the on-chain transaction confirms successfully.
+          </p>
+        </div>
       </div>
 
       {/* Stake panel */}
@@ -259,7 +279,8 @@ export default function GovernancePage() {
           <code className="text-[var(--accent)] ml-1">cast_vote</code> records your vote and validates your stake account hasn&apos;t expired.
         </p>
         <p>
-          Proposals are currently indexed off-chain. Full on-chain proposal creation coming in v2.1.
+          Proposals are currently seeded off-chain for demo purposes. Full on-chain proposal
+          creation (including on-chain storage and quorum enforcement) is planned for v2.1.
         </p>
       </div>
     </div>

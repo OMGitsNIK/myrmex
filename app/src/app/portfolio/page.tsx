@@ -110,13 +110,21 @@ function PolicyCard({ p }: { p: PolicyData }) {
 
       {isActive && (
         <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between">
-          <span className="text-xs text-gray-500">Demo a payout trigger</span>
-          <Link
-            href={`/simulate?policy=${pubkey}`}
-            className="text-xs border border-[var(--accent)]/40 text-[var(--accent)] px-3 py-1.5 rounded hover:border-[var(--accent)] transition-colors"
-          >
-            Simulate Trigger →
-          </Link>
+          <span className="text-xs text-gray-500">Trigger a payout or file a claim</span>
+          <div className="flex gap-2">
+            <Link
+              href={`/claim?policy=${pubkey}`}
+              className="text-xs border border-[var(--accent)]/40 text-[var(--accent)] px-3 py-1.5 rounded hover:border-[var(--accent)] transition-colors"
+            >
+              File a Claim →
+            </Link>
+            <Link
+              href={`/simulate?policy=${pubkey}`}
+              className="text-xs border border-[var(--border)] text-gray-400 px-3 py-1.5 rounded hover:border-gray-500 transition-colors"
+            >
+              Simulate →
+            </Link>
+          </div>
         </div>
       )}
     </div>

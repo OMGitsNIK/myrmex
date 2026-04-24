@@ -23,7 +23,8 @@ export interface Quote {
   breakdown: Record<string, unknown>;
 }
 
-// Local actuarial fallback used when the pricing API is unreachable.
+// Local rate estimates used when the pricing API is unreachable.
+// These are flat-rate approximations — NOT from the actuarial model.
 function localFallbackQuote(params: QuoteRequest): Quote {
   // Rates are floored at 5% (500 bps) to match on-chain minPremiumBps
   const base: Record<string, number> = {
@@ -50,10 +51,14 @@ function localFallbackQuote(params: QuoteRequest): Quote {
   };
 }
 
+export const FALLBACK_WARNING =
+  "Pricing API offline — showing estimated flat rates. Purchase is disabled until the API is reachable.";
+
 export function usePremiumQuote(params: QuoteRequest | null) {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isFallback, setIsFallback] = useState(false);
 
   useEffect(() => {
     if (!params || params.payout_amount_usdc <= 0) {
@@ -65,6 +70,7 @@ export function usePremiumQuote(params: QuoteRequest | null) {
     const timer = setTimeout(async () => {
       setLoading(true);
       setError(null);
+      setIsFallback(false);
       try {
         const res = await fetch(`${PRICING_API}/quote`, {
           method: "POST",
@@ -78,9 +84,10 @@ export function usePremiumQuote(params: QuoteRequest | null) {
       } catch (e: unknown) {
         const err = e as Error;
         if (err.name === "AbortError") return;
-        // Pricing API unreachable — use local actuarial fallback
+        // Pricing API unreachable — use local flat-rate fallback and flag it
         setQuote(localFallbackQuote(params));
-        setError(null);
+        setIsFallback(true);
+        setError(FALLBACK_WARNING);
       } finally {
         setLoading(false);
       }
@@ -93,5 +100,5 @@ export function usePremiumQuote(params: QuoteRequest | null) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(params)]);
 
-  return { quote, loading, error };
+  return { quote, loading, error, isFallback };
 }

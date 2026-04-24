@@ -94,7 +94,7 @@ export default function BuyPage() {
     pool_utilization_pct: 50,
   };
 
-  const { quote, loading: quoteLoading } = usePremiumQuote(quoteParams);
+  const { quote, loading: quoteLoading, isFallback } = usePremiumQuote(quoteParams);
 
   const riskColor =
     !quote ? "text-gray-400"
@@ -267,12 +267,16 @@ export default function BuyPage() {
                   </button>
                 </div>
                 <div className="flex gap-2">
+                  <a href={`/claim?policy=${pol.policyKey}`}
+                    className="text-xs border border-[var(--accent)]/40 text-[var(--accent)] px-3 py-1.5 rounded hover:border-[var(--accent)] transition-colors">
+                    File a Claim →
+                  </a>
                   <a href={`/simulate?policy=${pol.policyKey}`}
                     className="text-xs border border-gray-700 text-gray-400 px-3 py-1.5 rounded hover:border-gray-500 transition-colors">
                     Simulate →
                   </a>
                   <a href={explorerUrl(pol.txSig)} target="_blank" rel="noopener noreferrer"
-                    className="text-xs border border-[var(--accent)]/40 text-[var(--accent)] px-3 py-1.5 rounded hover:border-[var(--accent)] transition-colors">
+                    className="text-xs border border-gray-600 text-gray-400 px-3 py-1.5 rounded hover:border-gray-500 transition-colors">
                     Explorer →
                   </a>
                 </div>
@@ -466,9 +470,13 @@ export default function BuyPage() {
             )}
 
             {(quote as any).breakdown?.source === "local_fallback" && (
-              <p className="text-xs text-yellow-500/70 pt-1">
-                Estimate only — pricing API offline. Quote uses actuarial fallback rates.
-              </p>
+              <div className="mt-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 space-y-1">
+                <p className="text-xs text-yellow-400 font-semibold">⚠ Pricing API offline</p>
+                <p className="text-xs text-yellow-500/80">
+                  Showing estimated flat rates — not from the actuarial model.
+                  Purchase is disabled until the pricing service is reachable.
+                </p>
+              </div>
             )}
           </div>
         )}
@@ -476,11 +484,13 @@ export default function BuyPage() {
 
       <button
         onClick={handleBuy}
-        disabled={isSubmitting || !quote || !wallet}
+        disabled={isSubmitting || !quote || !wallet || isFallback}
         className="w-full bg-[var(--accent)] hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-black font-bold py-3.5 rounded-lg transition-opacity text-sm tracking-wide shadow-[0_0_20px_rgba(0,255,135,0.2)]"
       >
         {!wallet
           ? "Connect Wallet"
+          : isFallback
+          ? "Purchase Unavailable (Pricing API Offline)"
           : isSubmitting
           ? "Confirming on-chain…"
           : `Buy ${selectedType.name} Coverage — Pay $${quote?.premium_usdc?.toFixed(2) ?? "—"} USDC`}

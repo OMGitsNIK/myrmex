@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAnchorProgram } from "@/hooks/useAnchorProgram";
 import {
   API_URL,
@@ -30,7 +31,8 @@ interface PolicyInfo {
 
 export default function ClaimPage() {
   const { program, wallet } = useAnchorProgram();
-  const [policyPubkey, setPolicyPubkey] = useState("");
+  const searchParams = useSearchParams();
+  const [policyPubkey, setPolicyPubkey] = useState(() => searchParams.get("policy") ?? "");
   const [policyInfo, setPolicyInfo] = useState<PolicyInfo | null>(null);
   const [fetchingPolicy, setFetchingPolicy] = useState(false);
   const [oracleStatus, setOracleStatus] = useState<{

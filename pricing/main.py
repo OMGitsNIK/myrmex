@@ -1,7 +1,8 @@
 """
 MYRMEX v2 Pricing API
 ─────────────────────
-Six parametric insurance categories with actuarially calibrated risk models.
+Six parametric insurance categories with hardcoded probability tables
+(demo approximation — NOT derived from historical claims data).
 All premiums expressed as % of payout amount.
 
 Categories:
@@ -30,6 +31,13 @@ app.add_middleware(
 
 
 # ── Risk Tables ───────────────────────────────────────────────────────────
+#
+# IMPORTANT — these are expert-estimated probability-of-exceedance values,
+# NOT fitted to historical insurance loss data. They are reasonable
+# approximations suitable for a demo / proof-of-concept, but should be
+# replaced with actuarially fitted tables before any production deployment.
+#
+# Each entry is an (annual_prob, volatility) tuple keyed by threshold value.
 
 # Annual probability of exceedance by magnitude threshold & region
 EARTHQUAKE_RISK = {

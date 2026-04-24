@@ -1,4 +1,15 @@
-"""Real-world data fetchers for each coverage type."""
+"""
+Real-world data fetchers for each coverage type.
+
+DATA SOURCE LIMITATIONS (demo build)
+──────────────────────────────────────
+• Each fetcher uses a SINGLE provider — no cross-source validation is performed.
+• Crop drought: Open-Meteo only (free tier, precipitation_sum).
+• DeFi hack:   DeFiLlama only (TVL endpoint); no historical baseline stored —
+               current TVL is compared against itself (baseline_tvl = current × 1.0).
+• Flight delay: Mock only — reads MOCK_FLIGHT_DELAY_MINUTES env var (default 0).
+               No live aviation API is connected.
+"""
 import httpx
 from datetime import date, timedelta
 from app.config import (
@@ -9,8 +20,10 @@ from app.config import (
 
 async def get_rainfall_mm() -> float:
     """
-    Fetch total precipitation (mm) for yesterday from Open-Meteo.
+    Fetch total precipitation (mm) for yesterday from Open-Meteo (sole source).
     Scaled x100 and stored as i64 on-chain (e.g. 12.5 mm → 1250).
+
+    NOTE: Single-provider — no secondary source cross-check.
     """
     yesterday = (date.today() - timedelta(days=1)).isoformat()
     url = (
@@ -29,8 +42,13 @@ async def get_rainfall_mm() -> float:
 
 async def get_defi_tvl_usd() -> float:
     """
-    Fetch current TVL (USD) for a monitored DeFi protocol from DeFiLlama.
+    Fetch current TVL (USD) for a monitored DeFi protocol from DeFiLlama (sole source).
     Stored on-chain in whole USD (e.g. $4.2B → 4_200_000_000).
+
+    NOTE: Single-provider — no secondary source cross-check.
+    No historical baseline is stored; the oracle job compares current TVL against
+    itself (baseline_tvl = current × 1.0), so a genuine drop will only be detected
+    across consecutive poll intervals, not against a true historical high-water mark.
     """
     url = f"{DEFILLAMA_BASE}/tvl/{DEFI_PROTOCOL}"
     async with httpx.AsyncClient(timeout=10) as client:
@@ -41,11 +59,13 @@ async def get_defi_tvl_usd() -> float:
 
 async def get_flight_delay_minutes(flight_iata: str = "AA100") -> int:
     """
-    Returns estimated delay in minutes for a representative flight.
-    Uses mock data since OpenSky doesn't provide delay info directly;
-    in production replace with a paid aviation API (AviationStack etc.).
+    Returns delay in minutes for a representative flight.
+
+    ⚠  MOCK DATA — No live aviation API is connected.
+    Returns the value of the MOCK_FLIGHT_DELAY_MINUTES env var (default 0).
+    In production, replace with a paid API such as AviationStack or FlightAware.
     """
-    # Mock: returns 0 (on-time) unless env-overridden for demos
+    # Mock only: returns 0 (on-time) unless env-overridden for demos
     import os
     mock_delay = int(os.environ.get("MOCK_FLIGHT_DELAY_MINUTES", "0"))
     return mock_delay
