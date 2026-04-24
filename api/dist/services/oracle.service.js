@@ -145,6 +145,8 @@ async function fetchEarthquake() {
     const url = "https://earthquake.usgs.gov/fdsnws/event/1/query" +
         "?format=geojson&minmagnitude=4.5&orderby=magnitude&limit=1";
     const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!resp.ok)
+        throw new Error(`USGS earthquake returned ${resp.status} — skipping post`);
     const rawPayload = await resp.text();
     const data = JSON.parse(rawPayload);
     const features = data.features ?? [];
@@ -179,6 +181,8 @@ async function fetchEarthquake() {
 async function fetchFlood() {
     const url = `https://waterservices.usgs.gov/nwis/iv/?format=json&sites=${USGS_FLOOD_SITE}&parameterCd=00065`;
     const resp = await fetch(url, { signal: AbortSignal.timeout(12000) });
+    if (!resp.ok)
+        throw new Error(`USGS flood returned ${resp.status} — skipping post`);
     const rawPayload = await resp.text();
     const data = JSON.parse(rawPayload);
     const ts = data?.value?.timeSeries?.[0];
@@ -217,6 +221,8 @@ async function fetchCropComposite() {
         `&daily=precipitation_sum,temperature_2m_max,temperature_2m_min` +
         `&timezone=auto&start_date=${start14}&end_date=${end}`;
     const resp = await fetch(url, { signal: AbortSignal.timeout(12000) });
+    if (!resp.ok)
+        throw new Error(`Open-Meteo crop returned ${resp.status} — skipping post`);
     const rawPayload = await resp.text();
     const data = JSON.parse(rawPayload);
     const daily = data.daily ?? {};
@@ -288,6 +294,8 @@ async function fetchHurricane() {
 // ── 5. Stablecoin Depeg — CoinGecko ──────────────────────────────────────
 async function fetchStablecoinPrice() {
     const resp = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=usd-coin,tether&vs_currencies=usd&precision=6", { signal: AbortSignal.timeout(10000) });
+    if (!resp.ok)
+        throw new Error(`CoinGecko returned ${resp.status} — skipping post`);
     const rawPayload = await resp.text();
     const data = JSON.parse(rawPayload);
     const usdcPrice = data?.["usd-coin"]?.usd ?? 1.0;

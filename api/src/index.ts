@@ -1,4 +1,4 @@
-import express from "express";
+import express, { NextFunction, Request, Response } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
@@ -73,6 +73,18 @@ app.use("/api/proposals", proposalsRouter);
 app.get("/health", (_, res) =>
   res.json({ status: "ok", service: "myrmex-api", version: "2.0-oracle" })
 );
+
+// 404 for unmatched routes
+app.use((_req: Request, res: Response) => {
+  res.status(404).json({ error: "Not found" });
+});
+
+// Global error handler — catches any unhandled throw from async route handlers.
+// Without this, Express 4 returns an empty 500 or leaks a stack trace.
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  console.error("[api] unhandled error:", err.message, err.stack);
+  res.status(500).json({ error: "Internal server error" });
+});
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
