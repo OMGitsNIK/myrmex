@@ -1,6 +1,6 @@
-use anchor_lang::prelude::*;
-use crate::state::{PoolConfig, RiskPool};
 use crate::errors::MyrmexError;
+use crate::state::{PoolConfig, RiskPool};
+use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 pub struct InitializePoolConfig<'info> {
@@ -36,7 +36,10 @@ pub fn handler(
         (50..=10_000).contains(&min_premium_bps),
         MyrmexError::InvalidConfig
     );
-    require!(max_coverage_bps > 0 && max_coverage_bps <= 10_000, MyrmexError::InvalidConfig);
+    require!(
+        max_coverage_bps > 0 && max_coverage_bps <= 10_000,
+        MyrmexError::InvalidConfig
+    );
 
     let config = &mut ctx.accounts.pool_config;
     config.pool = ctx.accounts.pool.key();

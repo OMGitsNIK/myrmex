@@ -9,13 +9,19 @@ import { useState } from "react";
 
 const WalletMultiButton = dynamic(
   async () => {
-    const { WalletMultiButton } = await import("@solana/wallet-adapter-react-ui");
+    const { WalletMultiButton } = await import(
+      "@solana/wallet-adapter-react-ui"
+    );
     return WalletMultiButton;
   },
   { ssr: false }
 );
 
-export default function ClientProviders({ children }: { children: React.ReactNode }) {
+export default function ClientProviders({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const pathname = usePathname();
 
@@ -36,7 +42,10 @@ export default function ClientProviders({ children }: { children: React.ReactNod
       <nav className="border-b border-[var(--border)] px-6 py-4 relative z-10">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="text-xl font-bold tracking-widest text-[var(--accent)] glow-text">
+          <Link
+            href="/"
+            className="text-xl font-bold tracking-widest text-[var(--accent)] glow-text"
+          >
             MYRMEX
           </Link>
 
@@ -68,9 +77,21 @@ export default function ClientProviders({ children }: { children: React.ReactNod
               onClick={() => setMenuOpen(!menuOpen)}
               aria-label="Toggle menu"
             >
-              <span className={`block w-5 h-0.5 bg-[var(--accent)] transition-transform duration-200 ${menuOpen ? "rotate-45 translate-y-2" : ""}`} />
-              <span className={`block w-5 h-0.5 bg-[var(--accent)] transition-opacity duration-200 ${menuOpen ? "opacity-0" : ""}`} />
-              <span className={`block w-5 h-0.5 bg-[var(--accent)] transition-transform duration-200 ${menuOpen ? "-rotate-45 -translate-y-2" : ""}`} />
+              <span
+                className={`block w-5 h-0.5 bg-[var(--accent)] transition-transform duration-200 ${
+                  menuOpen ? "rotate-45 translate-y-2" : ""
+                }`}
+              />
+              <span
+                className={`block w-5 h-0.5 bg-[var(--accent)] transition-opacity duration-200 ${
+                  menuOpen ? "opacity-0" : ""
+                }`}
+              />
+              <span
+                className={`block w-5 h-0.5 bg-[var(--accent)] transition-transform duration-200 ${
+                  menuOpen ? "-rotate-45 -translate-y-2" : ""
+                }`}
+              />
             </button>
           </div>
         </div>

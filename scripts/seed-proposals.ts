@@ -8,11 +8,15 @@ import * as fs from "fs";
 import * as path from "path";
 
 const RPC_URL = "https://api.devnet.solana.com";
-const PROGRAM_ID = new PublicKey("9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan");
+const PROGRAM_ID = new PublicKey(
+  "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan"
+);
 
 function loadKeypair(): Keypair {
   const keyPath = path.join(process.env.HOME || "~", ".config/solana/id.json");
-  return Keypair.fromSecretKey(Buffer.from(JSON.parse(fs.readFileSync(keyPath, "utf-8"))));
+  return Keypair.fromSecretKey(
+    Buffer.from(JSON.parse(fs.readFileSync(keyPath, "utf-8")))
+  );
 }
 
 function toFixedBytes(s: string, len: number): number[] {
@@ -49,7 +53,9 @@ async function main() {
   const kp = loadKeypair();
   const connection = new Connection(RPC_URL, "confirmed");
   const wallet = new anchor.Wallet(kp);
-  const provider = new anchor.AnchorProvider(connection, wallet, { commitment: "confirmed" });
+  const provider = new anchor.AnchorProvider(connection, wallet, {
+    commitment: "confirmed",
+  });
 
   const idlPath = path.join(__dirname, "../api/src/idl/myrmex.json");
   const idl = JSON.parse(fs.readFileSync(idlPath, "utf-8"));
@@ -65,7 +71,11 @@ async function main() {
     // Check if already exists
     const existing = await connection.getAccountInfo(proposalPda);
     if (existing) {
-      console.log(`Proposal #${p.id} already exists at ${proposalPda.toBase58()} — skipping`);
+      console.log(
+        `Proposal #${
+          p.id
+        } already exists at ${proposalPda.toBase58()} — skipping`
+      );
       continue;
     }
 
@@ -83,7 +93,11 @@ async function main() {
       })
       .rpc();
 
-    console.log(`Created proposal #${p.id} "${p.title}" → ${proposalPda.toBase58()} (tx: ${sig})`);
+    console.log(
+      `Created proposal #${p.id} "${
+        p.title
+      }" → ${proposalPda.toBase58()} (tx: ${sig})`
+    );
   }
 
   console.log("Done.");

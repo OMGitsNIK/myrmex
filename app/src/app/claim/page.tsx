@@ -32,7 +32,9 @@ interface PolicyInfo {
 export default function ClaimPage() {
   const { program, wallet } = useAnchorProgram();
   const searchParams = useSearchParams();
-  const [policyPubkey, setPolicyPubkey] = useState(() => searchParams.get("policy") ?? "");
+  const [policyPubkey, setPolicyPubkey] = useState(
+    () => searchParams.get("policy") ?? ""
+  );
   const [policyInfo, setPolicyInfo] = useState<PolicyInfo | null>(null);
   const [fetchingPolicy, setFetchingPolicy] = useState(false);
   const [oracleStatus, setOracleStatus] = useState<{
@@ -77,7 +79,9 @@ export default function ClaimPage() {
 
         // Also check oracle report freshness
         const oracleRes = await fetch(
-          `${API_URL}/api/oracle-report/${data.account.pool}?scope_hash=${tc.scopeHash
+          `${API_URL}/api/oracle-report/${
+            data.account.pool
+          }?scope_hash=${tc.scopeHash
             .map((b: number) => b.toString(16).padStart(2, "0"))
             .join("")}`
         ).catch(() => null);
@@ -133,7 +137,7 @@ export default function ClaimPage() {
 
       // Fetch pool to get vault + usdcMint
       const poolsRes = await fetch(`${API_URL}/api/pools`);
-      const pools = await poolsRes.json() as any[];
+      const pools = (await poolsRes.json()) as any[];
       const pool = pools.find((p: any) => p.pubkey === policyInfo.pool);
       if (!pool) throw new Error("Pool not found");
 
@@ -163,17 +167,21 @@ export default function ClaimPage() {
 
       setClaimTx(tx);
       toast.success("Payout claimed successfully!");
-      setPolicyInfo((prev) => prev ? { ...prev, isClaimed: true, isActive: false } : prev);
+      setPolicyInfo((prev) =>
+        prev ? { ...prev, isClaimed: true, isActive: false } : prev
+      );
     } catch (e: unknown) {
       const err = e as Error;
       // Parse on-chain error for better UX
       if (err.message.includes("TriggerNotMet")) {
         toast.error("Trigger condition not met", {
-          description: "The oracle report does not satisfy your policy's trigger condition.",
+          description:
+            "The oracle report does not satisfy your policy's trigger condition.",
         });
       } else if (err.message.includes("OracleReportStale")) {
         toast.error("Oracle report is stale", {
-          description: "No fresh oracle data found. The oracle service posts reports every 5 minutes.",
+          description:
+            "No fresh oracle data found. The oracle service posts reports every 5 minutes.",
         });
       } else {
         toast.error("Claim failed", { description: err.message });
@@ -184,7 +192,9 @@ export default function ClaimPage() {
   };
 
   const triggerLabel = policyInfo
-    ? `oracle value ${COMPARISON_LABELS[policyInfo.comparison] ?? "?"} ${policyInfo.threshold}`
+    ? `oracle value ${COMPARISON_LABELS[policyInfo.comparison] ?? "?"} ${
+        policyInfo.threshold
+      }`
     : null;
 
   const canClaim =
@@ -195,9 +205,12 @@ export default function ClaimPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-white tracking-tight">Claim Payout</h1>
+        <h1 className="text-3xl font-bold text-white tracking-tight">
+          Claim Payout
+        </h1>
         <p className="text-gray-400 mt-2">
-          If your trigger condition is met, call the smart contract to receive your payout instantly.
+          If your trigger condition is met, call the smart contract to receive
+          your payout instantly.
         </p>
       </div>
 
@@ -205,19 +218,30 @@ export default function ClaimPage() {
       <div className="card p-5 space-y-2 text-sm text-gray-400">
         <p className="text-white font-semibold text-sm">How claims work</p>
         <p>
-          The oracle service monitors real-world events and posts signed data to the blockchain.
-          When conditions are met, anyone can trigger the payout — USDC always goes to the policyholder.
+          The oracle service monitors real-world events and posts signed data to
+          the blockchain. When conditions are met, anyone can trigger the payout
+          — USDC always goes to the policyholder.
         </p>
         <div className="flex gap-6 pt-1 text-xs">
-          <span><span className="text-[var(--accent)]">1.</span> Oracle posts data on-chain</span>
-          <span><span className="text-[var(--accent)]">2.</span> Smart contract verifies condition</span>
-          <span><span className="text-[var(--accent)]">3.</span> USDC sent instantly</span>
+          <span>
+            <span className="text-[var(--accent)]">1.</span> Oracle posts data
+            on-chain
+          </span>
+          <span>
+            <span className="text-[var(--accent)]">2.</span> Smart contract
+            verifies condition
+          </span>
+          <span>
+            <span className="text-[var(--accent)]">3.</span> USDC sent instantly
+          </span>
         </div>
       </div>
 
       {/* Policy lookup */}
       <div className="card p-6 space-y-4">
-        <h2 className="font-semibold text-white text-sm uppercase tracking-widest">Policy</h2>
+        <h2 className="font-semibold text-white text-sm uppercase tracking-widest">
+          Policy
+        </h2>
 
         <label className="block space-y-1">
           <span className="text-xs text-gray-500">Policy Public Key</span>
@@ -233,7 +257,9 @@ export default function ClaimPage() {
         </label>
 
         {fetchingPolicy && (
-          <p className="text-xs text-gray-500 animate-pulse">Loading policy...</p>
+          <p className="text-xs text-gray-500 animate-pulse">
+            Loading policy...
+          </p>
         )}
 
         {policyInfo && (
@@ -241,7 +267,8 @@ export default function ClaimPage() {
             <div className="px-4 py-3 flex justify-between text-sm">
               <span className="text-gray-400">Coverage Type</span>
               <span className="text-white">
-                {COVERAGE_NAMES[policyInfo.coverageType] ?? `Type ${policyInfo.coverageType}`}
+                {COVERAGE_NAMES[policyInfo.coverageType] ??
+                  `Type ${policyInfo.coverageType}`}
               </span>
             </div>
             <div className="px-4 py-3 flex justify-between text-sm">
@@ -272,11 +299,12 @@ export default function ClaimPage() {
                   : "Expired"}
               </span>
             </div>
-            {wallet && wallet.publicKey.toBase58() !== policyInfo.policyholder && (
-              <div className="px-4 py-3 text-xs text-yellow-400">
-                ⚠ Your wallet is not the policyholder for this policy.
-              </div>
-            )}
+            {wallet &&
+              wallet.publicKey.toBase58() !== policyInfo.policyholder && (
+                <div className="px-4 py-3 text-xs text-yellow-400">
+                  ⚠ Your wallet is not the policyholder for this policy.
+                </div>
+              )}
           </div>
         )}
       </div>
@@ -307,7 +335,9 @@ export default function ClaimPage() {
                 <span className="text-gray-400">Freshness</span>
                 <span
                   className={
-                    oracleStatus.is_fresh ? "text-[var(--accent)]" : "text-red-400"
+                    oracleStatus.is_fresh
+                      ? "text-[var(--accent)]"
+                      : "text-red-400"
                   }
                 >
                   {oracleStatus.is_fresh ? "✓ Fresh (valid)" : "⚠ Stale"}
@@ -316,7 +346,8 @@ export default function ClaimPage() {
             </div>
           ) : (
             <p className="text-sm text-gray-500">
-              No oracle report found for this pool yet. The oracle service posts reports every 5 minutes.
+              No oracle report found for this pool yet. The oracle service posts
+              reports every 5 minutes.
             </p>
           )}
         </div>
@@ -348,7 +379,9 @@ export default function ClaimPage() {
         <div className="card p-6 border-[var(--accent)]/30 space-y-3">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-[var(--accent)]" />
-            <span className="text-[var(--accent)] font-semibold text-sm">Payout Received</span>
+            <span className="text-[var(--accent)] font-semibold text-sm">
+              Payout Received
+            </span>
           </div>
           <p className="text-sm text-gray-400">
             USDC has been transferred to your wallet.

@@ -20,19 +20,27 @@ import * as path from "path";
 import { createHash } from "crypto";
 
 // ── Pool addresses ────────────────────────────────────────────────────────
-const EARTHQUAKE_POOL = process.env.EARTHQUAKE_POOL || "EHxPZAMvRhumjFeChfeD9bn2Ju1RWf7RM45pY5vzEhNH";
-const FLOOD_POOL      = process.env.FLOOD_POOL      || "HfyGsQVVsxt6BNM7UzTepBo91DKYdqLy7RKuLrwnM1YY";
-const CROP_POOL       = process.env.CROP_POOL       || "HuPG3dmBftRCAwg71tro7pmp2hjoCT8KWaNtytwUqUo2";
-const HURRICANE_POOL  = process.env.HURRICANE_POOL  || "ZZWgmeRUSdQyuarSb2zPFron2x88UgexhTQn8hJr9uD";
-const USDC_POOL       = process.env.USDC_POOL       || "CcGbU74HpT8sjDU5NDDWFzBPYEARBEfAac4ovDWwgxWU";
-const BRIDGE_POOL     = process.env.BRIDGE_POOL     || "AqKUYemw3A6GbYFnCFwE9S1f1QCfhH4EAjFQCDxyfUtQ";
+const EARTHQUAKE_POOL =
+  process.env.EARTHQUAKE_POOL || "EHxPZAMvRhumjFeChfeD9bn2Ju1RWf7RM45pY5vzEhNH";
+const FLOOD_POOL =
+  process.env.FLOOD_POOL || "HfyGsQVVsxt6BNM7UzTepBo91DKYdqLy7RKuLrwnM1YY";
+const CROP_POOL =
+  process.env.CROP_POOL || "HuPG3dmBftRCAwg71tro7pmp2hjoCT8KWaNtytwUqUo2";
+const HURRICANE_POOL =
+  process.env.HURRICANE_POOL || "ZZWgmeRUSdQyuarSb2zPFron2x88UgexhTQn8hJr9uD";
+const USDC_POOL =
+  process.env.USDC_POOL || "CcGbU74HpT8sjDU5NDDWFzBPYEARBEfAac4ovDWwgxWU";
+const BRIDGE_POOL =
+  process.env.BRIDGE_POOL || "AqKUYemw3A6GbYFnCFwE9S1f1QCfhH4EAjFQCDxyfUtQ";
 
 // Configurable oracle targets
-const CROP_LAT        = process.env.CROP_LAT        || "41.8781";  // Iowa
-const CROP_LON        = process.env.CROP_LON        || "-93.0977";
+const CROP_LAT = process.env.CROP_LAT || "41.8781"; // Iowa
+const CROP_LON = process.env.CROP_LON || "-93.0977";
 const USGS_FLOOD_SITE = process.env.USGS_FLOOD_SITE || "07010000"; // Mississippi @ St. Louis
-const RPC_URL         = process.env.RPC_URL         || "https://api.devnet.solana.com";
-const PROGRAM_ID      = new PublicKey(process.env.PROGRAM_ID || "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan");
+const RPC_URL = process.env.RPC_URL || "https://api.devnet.solana.com";
+const PROGRAM_ID = new PublicKey(
+  process.env.PROGRAM_ID || "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan"
+);
 
 const SCOPE_SEEDS = {
   earthquake: "earthquake:Global",
@@ -47,21 +55,32 @@ const SCOPE_SEEDS = {
 
 function loadOracleKeypair(): Keypair {
   if (process.env.ORACLE_KEYPAIR_JSON) {
-    return Keypair.fromSecretKey(Buffer.from(JSON.parse(process.env.ORACLE_KEYPAIR_JSON)));
+    return Keypair.fromSecretKey(
+      Buffer.from(JSON.parse(process.env.ORACLE_KEYPAIR_JSON))
+    );
   }
-  const keyPath = path.join(process.env.HOME || "~", ".config/solana/oracle.json");
+  const keyPath = path.join(
+    process.env.HOME || "~",
+    ".config/solana/oracle.json"
+  );
   if (fs.existsSync(keyPath)) {
-    return Keypair.fromSecretKey(Buffer.from(JSON.parse(fs.readFileSync(keyPath, "utf-8"))));
+    return Keypair.fromSecretKey(
+      Buffer.from(JSON.parse(fs.readFileSync(keyPath, "utf-8")))
+    );
   }
   const fallback = path.join(process.env.HOME || "~", ".config/solana/id.json");
-  return Keypair.fromSecretKey(Buffer.from(JSON.parse(fs.readFileSync(fallback, "utf-8"))));
+  return Keypair.fromSecretKey(
+    Buffer.from(JSON.parse(fs.readFileSync(fallback, "utf-8")))
+  );
 }
 
 function getOracleProgram() {
   const kp = loadOracleKeypair();
   const connection = new Connection(RPC_URL, "confirmed");
   const wallet = new anchor.Wallet(kp);
-  const provider = new anchor.AnchorProvider(connection, wallet, { commitment: "confirmed" });
+  const provider = new anchor.AnchorProvider(connection, wallet, {
+    commitment: "confirmed",
+  });
   const idlPath = path.join(__dirname, "../idl/myrmex.json");
   const idl = JSON.parse(fs.readFileSync(idlPath, "utf-8"));
   return { program: new anchor.Program(idl, provider), provider };
@@ -99,14 +118,20 @@ async function postReport(
 ): Promise<string> {
   const { program, provider } = getOracleProgram();
   const [poolConfigPda] = PublicKey.findProgramAddressSync(
-    [Buffer.from("pool_config"), poolPk.toBuffer()], PROGRAM_ID
+    [Buffer.from("pool_config"), poolPk.toBuffer()],
+    PROGRAM_ID
   );
   const [oracleReportPda] = PublicKey.findProgramAddressSync(
-    [Buffer.from("oracle_report"), poolPk.toBuffer(), Buffer.from(scope)], PROGRAM_ID
+    [Buffer.from("oracle_report"), poolPk.toBuffer(), Buffer.from(scope)],
+    PROGRAM_ID
   );
   const srcHash = rawPayload ? sourceHashOf(rawPayload) : undefined;
   return program.methods
-    .postOracleReport(new anchor.BN(value), scope, toDescBytes(description, srcHash))
+    .postOracleReport(
+      new anchor.BN(value),
+      scope,
+      toDescBytes(description, srcHash)
+    )
     .accounts({
       oracleAuthority: provider.wallet.publicKey,
       pool: poolPk,
@@ -119,14 +144,26 @@ async function postReport(
 
 // ── 1. Earthquake — USGS Real-time Feed ──────────────────────────────────
 
-async function fetchEarthquake(): Promise<{ magnitude: number; place: string; sources: string; rawPayload: string }> {
-  const url = "https://earthquake.usgs.gov/fdsnws/event/1/query" +
+async function fetchEarthquake(): Promise<{
+  magnitude: number;
+  place: string;
+  sources: string;
+  rawPayload: string;
+}> {
+  const url =
+    "https://earthquake.usgs.gov/fdsnws/event/1/query" +
     "?format=geojson&minmagnitude=4.5&orderby=magnitude&limit=1";
   const resp = await fetch(url, { signal: AbortSignal.timeout(10_000) });
   const rawPayload = await resp.text();
   const data = JSON.parse(rawPayload) as any;
   const features = data.features ?? [];
-  if (features.length === 0) return { magnitude: 0, place: "No M4.5+ events", sources: "USGS FDSN", rawPayload };
+  if (features.length === 0)
+    return {
+      magnitude: 0,
+      place: "No M4.5+ events",
+      sources: "USGS FDSN",
+      rawPayload,
+    };
 
   const top = features[0];
   const mag = top.properties.mag ?? 0;
@@ -141,7 +178,9 @@ async function fetchEarthquake(): Promise<{ magnitude: number; place: string; so
     );
     const d2 = (await r2.json()) as any;
     count2 = d2.count ?? 0;
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   return {
     magnitude: mag,
@@ -153,7 +192,12 @@ async function fetchEarthquake(): Promise<{ magnitude: number; place: string; so
 
 // ── 2. Flood — USGS Water Services ───────────────────────────────────────
 
-async function fetchFlood(): Promise<{ gaugeFt: number; siteName: string; sources: string; rawPayload: string }> {
+async function fetchFlood(): Promise<{
+  gaugeFt: number;
+  siteName: string;
+  sources: string;
+  rawPayload: string;
+}> {
   const url = `https://waterservices.usgs.gov/nwis/iv/?format=json&sites=${USGS_FLOOD_SITE}&parameterCd=00065`;
   const resp = await fetch(url, { signal: AbortSignal.timeout(12_000) });
   const rawPayload = await resp.text();
@@ -167,18 +211,24 @@ async function fetchFlood(): Promise<{ gaugeFt: number; siteName: string; source
   let medianFt: number | null = null;
   try {
     const today = new Date();
-    const mmdd = `${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const mmdd = `${String(today.getMonth() + 1).padStart(2, "0")}-${String(
+      today.getDate()
+    ).padStart(2, "0")}`;
     const r2 = await fetch(
       `https://waterservices.usgs.gov/nwis/stat/?format=json&sites=${USGS_FLOOD_SITE}&parameterCd=00065&statReportType=daily&statYearType=calendar`,
       { signal: AbortSignal.timeout(8_000) }
     );
     const d2 = (await r2.json()) as any;
-    const rec = (d2?.value?.timeSeries?.[0]?.values?.[0]?.value ?? [])
-      .find((v: any) => v.dateTime?.slice(5, 10) === mmdd);
+    const rec = (d2?.value?.timeSeries?.[0]?.values?.[0]?.value ?? []).find(
+      (v: any) => v.dateTime?.slice(5, 10) === mmdd
+    );
     medianFt = rec ? parseFloat(rec.value) : null;
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
-  const crossCheck = medianFt !== null ? ` | median: ${medianFt.toFixed(1)}ft` : "";
+  const crossCheck =
+    medianFt !== null ? ` | median: ${medianFt.toFixed(1)}ft` : "";
   return {
     gaugeFt,
     siteName,
@@ -189,10 +239,16 @@ async function fetchFlood(): Promise<{ gaugeFt: number; siteName: string; source
 
 // ── 3. Crop Multi-Factor — Open-Meteo composite ───────────────────────────
 
-async function fetchCropComposite(): Promise<{ score: number; sources: string; rawPayload: string }> {
+async function fetchCropComposite(): Promise<{
+  score: number;
+  sources: string;
+  rawPayload: string;
+}> {
   const today = new Date();
   const end = today.toISOString().split("T")[0];
-  const start14 = new Date(today.getTime() - 14 * 86400_000).toISOString().split("T")[0];
+  const start14 = new Date(today.getTime() - 14 * 86400_000)
+    .toISOString()
+    .split("T")[0];
 
   const url =
     `https://archive-api.open-meteo.com/v1/archive` +
@@ -205,33 +261,47 @@ async function fetchCropComposite(): Promise<{ score: number; sources: string; r
   const data = JSON.parse(rawPayload) as any;
   const daily = data.daily ?? {};
   const precip: number[] = daily.precipitation_sum ?? [];
-  const tMax: number[]   = daily.temperature_2m_max ?? [];
+  const tMax: number[] = daily.temperature_2m_max ?? [];
 
-  const avgPrecip = precip.length ? precip.reduce((a, b) => a + (b ?? 0), 0) / precip.length : 0;
+  const avgPrecip = precip.length
+    ? precip.reduce((a, b) => a + (b ?? 0), 0) / precip.length
+    : 0;
   const precipScore = Math.min(10000, Math.round((avgPrecip / 3.0) * 10000));
 
   const heatDays = tMax.filter((t) => t > 35).length;
   const heatScore = Math.max(0, 10000 - heatDays * 1000);
 
-  let maxDryStreak = 0, streak = 0;
+  let maxDryStreak = 0,
+    streak = 0;
   for (const p of precip) {
-    if ((p ?? 0) < 1) { streak++; maxDryStreak = Math.max(maxDryStreak, streak); }
-    else streak = 0;
+    if ((p ?? 0) < 1) {
+      streak++;
+      maxDryStreak = Math.max(maxDryStreak, streak);
+    } else streak = 0;
   }
   const dryScore = Math.max(0, 10000 - maxDryStreak * 800);
 
-  const composite = Math.round(precipScore * 0.4 + heatScore * 0.3 + dryScore * 0.3);
+  const composite = Math.round(
+    precipScore * 0.4 + heatScore * 0.3 + dryScore * 0.3
+  );
 
   const sources =
     `Open-Meteo 14d @ ${CROP_LAT},${CROP_LON}: ` +
-    `rain=${avgPrecip.toFixed(1)}mm/d heat=${heatDays}d>35C dry=${maxDryStreak}d score=${composite}/10000`;
+    `rain=${avgPrecip.toFixed(
+      1
+    )}mm/d heat=${heatDays}d>35C dry=${maxDryStreak}d score=${composite}/10000`;
 
   return { score: composite, sources, rawPayload };
 }
 
 // ── 4. Hurricane — NOAA NHC + Weather.gov Alerts ─────────────────────────
 
-async function fetchHurricane(): Promise<{ windKnots: number; name: string; sources: string; rawPayload: string }> {
+async function fetchHurricane(): Promise<{
+  windKnots: number;
+  name: string;
+  sources: string;
+  rawPayload: string;
+}> {
   let windKnots = 0;
   let stormName = "No active storm";
   let rawPayload = "{}";
@@ -250,17 +320,24 @@ async function fetchHurricane(): Promise<{ windKnots: number; name: string; sour
         stormName = s.name ?? "Unnamed";
       }
     }
-  } catch { /* NHC may be rate-limited */ }
+  } catch {
+    /* NHC may be rate-limited */
+  }
 
   let alertCount = 0;
   try {
     const r2 = await fetch(
       "https://api.weather.gov/alerts/active?event=Hurricane+Warning,Tropical+Storm+Warning",
-      { headers: { "User-Agent": "myrmex-oracle/1.0" }, signal: AbortSignal.timeout(8_000) }
+      {
+        headers: { "User-Agent": "myrmex-oracle/1.0" },
+        signal: AbortSignal.timeout(8_000),
+      }
     );
     const d2 = (await r2.json()) as any;
     alertCount = (d2?.features ?? []).length;
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   return {
     windKnots,
@@ -272,7 +349,12 @@ async function fetchHurricane(): Promise<{ windKnots: number; name: string; sour
 
 // ── 5. Stablecoin Depeg — CoinGecko ──────────────────────────────────────
 
-async function fetchStablecoinPrice(): Promise<{ usdcBps: number; usdtBps: number; sources: string; rawPayload: string }> {
+async function fetchStablecoinPrice(): Promise<{
+  usdcBps: number;
+  usdtBps: number;
+  sources: string;
+  rawPayload: string;
+}> {
   const resp = await fetch(
     "https://api.coingecko.com/api/v3/simple/price?ids=usd-coin,tether&vs_currencies=usd&precision=6",
     { signal: AbortSignal.timeout(10_000) }
@@ -292,13 +374,19 @@ async function fetchStablecoinPrice(): Promise<{ usdcBps: number; usdtBps: numbe
     );
     const d2 = (await r2.json()) as any;
     usdcMarketCap = d2?.market_data?.market_cap?.usd ?? null;
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
-  const mcStr = usdcMarketCap ? ` mcap=$${(usdcMarketCap / 1e9).toFixed(1)}B` : "";
+  const mcStr = usdcMarketCap
+    ? ` mcap=$${(usdcMarketCap / 1e9).toFixed(1)}B`
+    : "";
   return {
     usdcBps,
     usdtBps,
-    sources: `CoinGecko USDC=$${usdcPrice.toFixed(4)} USDT=$${usdtPrice.toFixed(4)}${mcStr}`,
+    sources: `CoinGecko USDC=$${usdcPrice.toFixed(4)} USDT=$${usdtPrice.toFixed(
+      4
+    )}${mcStr}`,
     rawPayload,
   };
 }
@@ -307,43 +395,63 @@ async function fetchStablecoinPrice(): Promise<{ usdcBps: number; usdtBps: numbe
 
 const BRIDGE_PROTOCOLS = ["wormhole", "stargate", "across"];
 
-async function fetchBridgeTvl(): Promise<{ tvlMillions: number; sources: string; rawPayload: string }> {
+async function fetchBridgeTvl(): Promise<{
+  tvlMillions: number;
+  sources: string;
+  rawPayload: string;
+}> {
   let totalTvl = 0;
   let rawPayload = "{}";
   const tvls: string[] = [];
   for (const protocol of BRIDGE_PROTOCOLS) {
     try {
-      const resp = await fetch(`https://api.llama.fi/tvl/${protocol}`, { signal: AbortSignal.timeout(8_000) });
+      const resp = await fetch(`https://api.llama.fi/tvl/${protocol}`, {
+        signal: AbortSignal.timeout(8_000),
+      });
       const text = await resp.text();
       const tvl = parseFloat(text);
       if (!isNaN(tvl) && tvl > 0) {
         totalTvl += tvl;
         tvls.push(`${protocol}=$${(tvl / 1e9).toFixed(2)}B`);
-        if (protocol === "wormhole") rawPayload = JSON.stringify({ protocol, tvl: text.trim() });
+        if (protocol === "wormhole")
+          rawPayload = JSON.stringify({ protocol, tvl: text.trim() });
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
   const tvlMillions = Math.round(totalTvl / 1_000_000);
 
   let tvlDrop = "";
   try {
-    const r2 = await fetch("https://api.llama.fi/protocol/wormhole", { signal: AbortSignal.timeout(8_000) });
+    const r2 = await fetch("https://api.llama.fi/protocol/wormhole", {
+      signal: AbortSignal.timeout(8_000),
+    });
     const d2 = (await r2.json()) as any;
     const chainTvls: Record<string, number> = d2?.currentChainTvls ?? {};
     const wormholeChainTvl = Object.values(chainTvls).reduce(
-      (a: number, b: unknown) => a + (typeof b === "number" ? b : 0), 0
+      (a: number, b: unknown) => a + (typeof b === "number" ? b : 0),
+      0
     );
     const wormholeSlug = tvls.find((t) => t.startsWith("wormhole="));
     if (wormholeSlug && wormholeChainTvl > 0) {
-      const slugTvl = parseFloat(wormholeSlug.replace(/.*=\$/, "").replace("B", "")) * 1e9;
-      const dropPct = ((slugTvl - wormholeChainTvl) / Math.max(slugTvl, wormholeChainTvl)) * 100;
-      if (Math.abs(dropPct) > 30) tvlDrop = ` WARN:tvl_discrepancy=${dropPct.toFixed(0)}%`;
+      const slugTvl =
+        parseFloat(wormholeSlug.replace(/.*=\$/, "").replace("B", "")) * 1e9;
+      const dropPct =
+        ((slugTvl - wormholeChainTvl) / Math.max(slugTvl, wormholeChainTvl)) *
+        100;
+      if (Math.abs(dropPct) > 30)
+        tvlDrop = ` WARN:tvl_discrepancy=${dropPct.toFixed(0)}%`;
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   return {
     tvlMillions,
-    sources: `DeFiLlama: ${tvls.join(" ")} total=$${(totalTvl / 1e9).toFixed(2)}B${tvlDrop}`,
+    sources: `DeFiLlama: ${tvls.join(" ")} total=$${(totalTvl / 1e9).toFixed(
+      2
+    )}B${tvlDrop}`,
     rawPayload,
   };
 }
@@ -360,7 +468,11 @@ async function runEarthquakeJob() {
     `EQ M${magnitude.toFixed(1)} ${place.slice(0, 60)}`,
     rawPayload
   );
-  console.log(`[oracle:earthquake] M${magnitude.toFixed(1)} value=${onChainValue} tx=${tx.slice(0, 16)}… | ${sources}`);
+  console.log(
+    `[oracle:earthquake] M${magnitude.toFixed(
+      1
+    )} value=${onChainValue} tx=${tx.slice(0, 16)}… | ${sources}`
+  );
 }
 
 async function runFloodJob() {
@@ -373,7 +485,12 @@ async function runFloodJob() {
     `Flood ${gaugeFt.toFixed(1)}ft ${siteName.slice(0, 50)}`,
     rawPayload
   );
-  console.log(`[oracle:flood] ${gaugeFt.toFixed(1)}ft value=${onChainValue} tx=${tx.slice(0, 16)}… | ${sources}`);
+  console.log(
+    `[oracle:flood] ${gaugeFt.toFixed(1)}ft value=${onChainValue} tx=${tx.slice(
+      0,
+      16
+    )}… | ${sources}`
+  );
 }
 
 async function runCropJob() {
@@ -385,7 +502,9 @@ async function runCropJob() {
     `Crop ${score}/10000 ${sources.slice(0, 70)}`,
     rawPayload
   );
-  console.log(`[oracle:crop] score=${score}/10000 tx=${tx.slice(0, 16)}… | ${sources}`);
+  console.log(
+    `[oracle:crop] score=${score}/10000 tx=${tx.slice(0, 16)}… | ${sources}`
+  );
 }
 
 async function runHurricaneJob() {
@@ -397,11 +516,17 @@ async function runHurricaneJob() {
     `Hurricane ${name} ${windKnots}kt`,
     rawPayload
   );
-  console.log(`[oracle:hurricane] ${name} ${windKnots}kt tx=${tx.slice(0, 16)}… | ${sources}`);
+  console.log(
+    `[oracle:hurricane] ${name} ${windKnots}kt tx=${tx.slice(
+      0,
+      16
+    )}… | ${sources}`
+  );
 }
 
 async function runStablecoinJob() {
-  const { usdcBps, usdtBps, sources, rawPayload } = await fetchStablecoinPrice();
+  const { usdcBps, usdtBps, sources, rawPayload } =
+    await fetchStablecoinPrice();
   const onChainValue = Math.min(usdcBps, usdtBps);
   const tx = await postReport(
     new PublicKey(USDC_POOL),
@@ -410,7 +535,12 @@ async function runStablecoinJob() {
     `USDC ${(usdcBps / 100).toFixed(2)}c USDT ${(usdtBps / 100).toFixed(2)}c`,
     rawPayload
   );
-  console.log(`[oracle:stablecoin] USDC=${usdcBps}bps USDT=${usdtBps}bps tx=${tx.slice(0, 16)}… | ${sources}`);
+  console.log(
+    `[oracle:stablecoin] USDC=${usdcBps}bps USDT=${usdtBps}bps tx=${tx.slice(
+      0,
+      16
+    )}… | ${sources}`
+  );
 }
 
 async function runBridgeJob() {
@@ -418,7 +548,9 @@ async function runBridgeJob() {
 
   // Skip posting if all fetches failed — zero TVL on data outage would false-trigger policies
   if (tvlMillions === 0) {
-    console.warn("[oracle:bridge] SKIPPED: tvlMillions=0 — all DeFiLlama fetches failed (data outage guard)");
+    console.warn(
+      "[oracle:bridge] SKIPPED: tvlMillions=0 — all DeFiLlama fetches failed (data outage guard)"
+    );
     return;
   }
 
@@ -429,24 +561,42 @@ async function runBridgeJob() {
     `Bridges $${(tvlMillions / 1000).toFixed(1)}B`,
     rawPayload
   );
-  console.log(`[oracle:bridge] tvl=$${(tvlMillions / 1000).toFixed(1)}B value=${tvlMillions}M tx=${tx.slice(0, 16)}… | ${sources}`);
+  console.log(
+    `[oracle:bridge] tvl=$${(tvlMillions / 1000).toFixed(
+      1
+    )}B value=${tvlMillions}M tx=${tx.slice(0, 16)}… | ${sources}`
+  );
 }
 
 // ── Scheduler ─────────────────────────────────────────────────────────────
 
 async function runAllJobs() {
   await Promise.allSettled([
-    runEarthquakeJob().catch((e) => console.error("[oracle:earthquake] error:", e.message)),
-    runFloodJob().catch((e)      => console.error("[oracle:flood] error:",      e.message)),
-    runCropJob().catch((e)       => console.error("[oracle:crop] error:",       e.message)),
-    runHurricaneJob().catch((e)  => console.error("[oracle:hurricane] error:",  e.message)),
-    runStablecoinJob().catch((e) => console.error("[oracle:stablecoin] error:", e.message)),
-    runBridgeJob().catch((e)     => console.error("[oracle:bridge] error:",     e.message)),
+    runEarthquakeJob().catch((e) =>
+      console.error("[oracle:earthquake] error:", e.message)
+    ),
+    runFloodJob().catch((e) =>
+      console.error("[oracle:flood] error:", e.message)
+    ),
+    runCropJob().catch((e) => console.error("[oracle:crop] error:", e.message)),
+    runHurricaneJob().catch((e) =>
+      console.error("[oracle:hurricane] error:", e.message)
+    ),
+    runStablecoinJob().catch((e) =>
+      console.error("[oracle:stablecoin] error:", e.message)
+    ),
+    runBridgeJob().catch((e) =>
+      console.error("[oracle:bridge] error:", e.message)
+    ),
   ]);
 }
 
 export function startOracleCron() {
   cron.schedule("*/5 * * * *", runAllJobs);
-  console.log("Oracle cron started (5-min) — Earthquake|Flood|Crop|Hurricane|Stablecoin|Bridge");
-  runAllJobs().catch((e) => console.error("[oracle] startup error:", e.message));
+  console.log(
+    "Oracle cron started (5-min) — Earthquake|Flood|Crop|Hurricane|Stablecoin|Bridge"
+  );
+  runAllJobs().catch((e) =>
+    console.error("[oracle] startup error:", e.message)
+  );
 }

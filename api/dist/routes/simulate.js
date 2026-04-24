@@ -90,12 +90,16 @@ function getOracleProgram() {
 // Dev/demo only — disabled in production unless ALLOW_SIMULATE=true is explicitly set.
 router.post("/", async (req, res) => {
     if (process.env.ALLOW_SIMULATE !== "true") {
-        return res.status(403).json({ error: "simulate-trigger is disabled in production" });
+        return res
+            .status(403)
+            .json({ error: "simulate-trigger is disabled in production" });
     }
     try {
-        const { policy: policyPubkeyStr, oracle_value, signature, message } = req.body;
+        const { policy: policyPubkeyStr, oracle_value, signature, message, } = req.body;
         if (!signature || !message) {
-            return res.status(400).json({ error: "signature and message are required" });
+            return res
+                .status(400)
+                .json({ error: "signature and message are required" });
         }
         const { program, provider } = (0, anchor_service_1.getAnchorProgram)();
         const policyPk = new web3_js_1.PublicKey(policyPubkeyStr);
@@ -108,12 +112,17 @@ router.post("/", async (req, res) => {
         const msgBytes = new Uint8Array(message);
         const sigBytes = new Uint8Array(signature);
         const pkBytes = new web3_js_1.PublicKey(onChainPolicyholder).toBytes();
-        if (Buffer.from(msgBytes).toString() !== Buffer.from(expectedMessage).toString()) {
+        if (Buffer.from(msgBytes).toString() !==
+            Buffer.from(expectedMessage).toString()) {
             return res.status(403).json({ error: "Invalid message content" });
         }
         const valid = ed25519_1.ed25519.verify(sigBytes, msgBytes, pkBytes);
         if (!valid) {
-            return res.status(403).json({ error: "Signature verification failed — only the policyholder can simulate" });
+            return res
+                .status(403)
+                .json({
+                error: "Signature verification failed — only the policyholder can simulate",
+            });
         }
         const poolPk = policyAccount.pool;
         const poolAccount = (await program.account.riskPool.fetch(poolPk));

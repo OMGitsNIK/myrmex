@@ -1,6 +1,6 @@
-use anchor_lang::prelude::*;
 use crate::errors::MyrmexError;
 use crate::state::{OracleAuthorityProposal, PoolConfig, RiskPool};
+use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 pub struct ApplyOracleAuthority<'info> {

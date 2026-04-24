@@ -1,6 +1,6 @@
-use anchor_lang::prelude::*;
-use crate::state::{PoolConfig, RiskPool};
 use crate::errors::MyrmexError;
+use crate::state::{PoolConfig, RiskPool};
+use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 pub struct UpdatePoolConfig<'info> {

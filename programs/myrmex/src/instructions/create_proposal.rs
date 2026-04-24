@@ -1,6 +1,6 @@
-use anchor_lang::prelude::*;
 use crate::errors::MyrmexError;
 use crate::state::GovernanceProposal;
+use anchor_lang::prelude::*;
 
 /// Minimum voting duration: 1 day. Maximum: 30 days.
 const MIN_VOTING_SECS: i64 = 86_400;
@@ -53,6 +53,10 @@ pub fn handler(
     proposal.executed = false;
     proposal.bump = ctx.bumps.proposal;
 
-    msg!("Proposal #{} created: voting ends at {}", proposal_id, proposal.voting_ends_at);
+    msg!(
+        "Proposal #{} created: voting ends at {}",
+        proposal_id,
+        proposal.voting_ends_at
+    );
     Ok(())
 }

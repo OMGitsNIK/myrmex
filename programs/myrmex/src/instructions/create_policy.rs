@@ -87,7 +87,10 @@ pub fn handler(
     );
 
     // comparison must be a known operator: 0=GT, 1=LT, 2=EQ
-    require!(trigger_condition.comparison <= 2, MyrmexError::InvalidConfig);
+    require!(
+        trigger_condition.comparison <= 2,
+        MyrmexError::InvalidConfig
+    );
 
     // Oracle pubkey must be the pool's authoritative oracle — not the user's wallet
     require!(
@@ -105,7 +108,10 @@ pub fn handler(
         .ok_or(error!(MyrmexError::MathOverflow))?
         .checked_div(10_000)
         .ok_or(error!(MyrmexError::MathOverflow))?;
-    require!(premium_amount >= min_premium, MyrmexError::InsufficientPremium);
+    require!(
+        premium_amount >= min_premium,
+        MyrmexError::InsufficientPremium
+    );
 
     // Coverage cap: (locked + new_payout) must not exceed max_coverage_bps% of total_liquidity
     let new_locked = ctx

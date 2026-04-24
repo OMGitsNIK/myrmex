@@ -12,8 +12,9 @@ export default function Home() {
           MYRMEX
         </h1>
         <p className="text-lg sm:text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed">
-          Decentralized parametric insurance on Solana. Real-world oracle data triggers
-          automatic USDC payouts in under 1 second — no adjusters, no delays, no trust required.
+          Decentralized parametric insurance on Solana. Real-world oracle data
+          triggers automatic USDC payouts in under 1 second — no adjusters, no
+          delays, no trust required.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
           <Link
@@ -45,8 +46,13 @@ export default function Home() {
           { label: "Annual Market Gap", value: "$200B+" },
           { label: "Chain", value: "Solana" },
         ].map((s) => (
-          <div key={s.label} className="bg-[var(--surface)] px-6 py-5 text-center">
-            <div className="text-[var(--accent)] font-bold text-lg">{s.value}</div>
+          <div
+            key={s.label}
+            className="bg-[var(--surface)] px-6 py-5 text-center"
+          >
+            <div className="text-[var(--accent)] font-bold text-lg">
+              {s.value}
+            </div>
             <div className="text-gray-500 text-xs mt-1">{s.label}</div>
           </div>
         ))}
@@ -54,10 +60,13 @@ export default function Home() {
 
       {/* Coverage types — 3×2 grid */}
       <div>
-        <h2 className="text-xl font-semibold text-white mb-2 tracking-wide">6 Live Insurance Markets</h2>
+        <h2 className="text-xl font-semibold text-white mb-2 tracking-wide">
+          6 Live Insurance Markets
+        </h2>
         <p className="text-gray-500 text-sm mb-6">
-          Every category is backed by real oracle data — USGS, NOAA, CoinGecko, DeFiLlama, Open-Meteo.
-          Premiums are priced by an actuarial model tuned to historical event frequencies.
+          Every category is backed by real oracle data — USGS, NOAA, CoinGecko,
+          DeFiLlama, Open-Meteo. Premiums are priced by an actuarial model tuned
+          to historical event frequencies.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           {COVERAGE_CARDS.map((c) => (
@@ -65,17 +74,26 @@ export default function Home() {
               key={c.title}
               className="card card-hover p-6 space-y-3 group relative overflow-hidden"
             >
-              <div className="absolute top-0 right-0 w-24 h-24 opacity-5 rounded-full blur-2xl pointer-events-none" style={{ background: c.color }} />
+              <div
+                className="absolute top-0 right-0 w-24 h-24 opacity-5 rounded-full blur-2xl pointer-events-none"
+                style={{ background: c.color }}
+              />
               <div className="text-2xl">{c.icon}</div>
               <h3 className="font-semibold text-white">{c.title}</h3>
-              <p className="text-sm text-gray-400 leading-relaxed">{c.description}</p>
+              <p className="text-sm text-gray-400 leading-relaxed">
+                {c.description}
+              </p>
               <div className="flex items-center justify-between pt-1">
                 <div className="text-xs text-[var(--accent)] font-mono bg-[var(--accent-dim)] px-2 py-1 rounded">
                   {c.trigger}
                 </div>
-                <div className="text-xs text-gray-600 font-medium">{c.gap} gap</div>
+                <div className="text-xs text-gray-600 font-medium">
+                  {c.gap} gap
+                </div>
               </div>
-              <div className="text-[10px] text-gray-600 pt-0.5">Oracle: {c.oracle}</div>
+              <div className="text-[10px] text-gray-600 pt-0.5">
+                Oracle: {c.oracle}
+              </div>
             </div>
           ))}
         </div>
@@ -83,7 +101,9 @@ export default function Home() {
 
       {/* How it works */}
       <div className="card p-8">
-        <h2 className="text-xl font-semibold text-white mb-8 tracking-wide">How it works</h2>
+        <h2 className="text-xl font-semibold text-white mb-8 tracking-wide">
+          How it works
+        </h2>
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-8">
           {STEPS.map((s, i) => (
             <div key={i} className="space-y-3">
@@ -103,7 +123,9 @@ export default function Home() {
           <div key={t.title} className="card p-5 space-y-2">
             <div className="text-lg">{t.icon}</div>
             <div className="font-semibold text-white text-sm">{t.title}</div>
-            <div className="text-xs text-gray-400 leading-relaxed">{t.desc}</div>
+            <div className="text-xs text-gray-400 leading-relaxed">
+              {t.desc}
+            </div>
           </div>
         ))}
       </div>
@@ -123,7 +145,8 @@ const COVERAGE_CARDS = [
   {
     icon: "🌍",
     title: "Earthquake",
-    description: "Pays when USGS confirms a major earthquake above your magnitude threshold. 130M+ people in seismic zones are uninsured.",
+    description:
+      "Pays when USGS confirms a major earthquake above your magnitude threshold. 130M+ people in seismic zones are uninsured.",
     trigger: "mag > threshold",
     gap: "$40B",
     oracle: "USGS Earthquake API",
@@ -132,7 +155,8 @@ const COVERAGE_CARDS = [
   {
     icon: "🌊",
     title: "Flood",
-    description: "Triggered by USGS river gauge readings. Only 5% of global flood losses are covered by traditional insurance.",
+    description:
+      "Triggered by USGS river gauge readings. Only 5% of global flood losses are covered by traditional insurance.",
     trigger: "gauge_ft > threshold",
     gap: "$58B",
     oracle: "USGS Water Services",
@@ -141,7 +165,8 @@ const COVERAGE_CARDS = [
   {
     icon: "🌾",
     title: "Crop Multi-Factor",
-    description: "Composite AI score tracks rainfall, heat stress, and dry days. 500M smallholder farmers have zero safety net.",
+    description:
+      "Composite AI score tracks rainfall, heat stress, and dry days. 500M smallholder farmers have zero safety net.",
     trigger: "score < threshold",
     gap: "$100B+",
     oracle: "Open-Meteo dual-source",
@@ -150,7 +175,8 @@ const COVERAGE_CARDS = [
   {
     icon: "🌀",
     title: "Hurricane / Cyclone",
-    description: "NOAA NHC real-time storm data. Coastal communities face $30B+ in annual uninsured losses every hurricane season.",
+    description:
+      "NOAA NHC real-time storm data. Coastal communities face $30B+ in annual uninsured losses every hurricane season.",
     trigger: "wind_kt > threshold",
     gap: "$30B",
     oracle: "NOAA NHC + Weather.gov",
@@ -159,7 +185,8 @@ const COVERAGE_CARDS = [
   {
     icon: "💵",
     title: "Stablecoin Depeg",
-    description: "Pays if USDC or USDT trades below your peg threshold. UST wiped out $40B overnight — holders had no safety net.",
+    description:
+      "Pays if USDC or USDT trades below your peg threshold. UST wiped out $40B overnight — holders had no safety net.",
     trigger: "price < threshold",
     gap: "Growing",
     oracle: "CoinGecko dual-endpoint",
@@ -168,7 +195,8 @@ const COVERAGE_CARDS = [
   {
     icon: "🛡",
     title: "Bridge / Exchange Hack",
-    description: "TVL velocity detection across Wormhole, Stargate, Across. Over $3B lost to bridge exploits in 2023 alone.",
+    description:
+      "TVL velocity detection across Wormhole, Stargate, Across. Over $3B lost to bridge exploits in 2023 alone.",
     trigger: "TVL < threshold",
     gap: "$3B+/yr",
     oracle: "DeFiLlama bridges",

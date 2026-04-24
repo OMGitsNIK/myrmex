@@ -43,7 +43,8 @@ export function usePolicies() {
         return r.json();
       })
       .then((data: unknown) => {
-        if (!Array.isArray(data)) throw new Error("Unexpected API response shape");
+        if (!Array.isArray(data))
+          throw new Error("Unexpected API response shape");
         setPolicies(data as PolicyData[]);
         setError(null);
       })

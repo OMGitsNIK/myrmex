@@ -94,7 +94,9 @@ function getOracleProgram() {
     const kp = loadOracleKeypair();
     const connection = new web3_js_1.Connection(RPC_URL, "confirmed");
     const wallet = new anchor.Wallet(kp);
-    const provider = new anchor.AnchorProvider(connection, wallet, { commitment: "confirmed" });
+    const provider = new anchor.AnchorProvider(connection, wallet, {
+        commitment: "confirmed",
+    });
     const idlPath = path.join(__dirname, "../idl/myrmex.json");
     const idl = JSON.parse(fs.readFileSync(idlPath, "utf-8"));
     return { program: new anchor.Program(idl, provider), provider };
@@ -144,7 +146,12 @@ async function fetchEarthquake() {
     const data = JSON.parse(rawPayload);
     const features = data.features ?? [];
     if (features.length === 0)
-        return { magnitude: 0, place: "No M4.5+ events", sources: "USGS FDSN", rawPayload };
+        return {
+            magnitude: 0,
+            place: "No M4.5+ events",
+            sources: "USGS FDSN",
+            rawPayload,
+        };
     const top = features[0];
     const mag = top.properties.mag ?? 0;
     const place = top.properties.place ?? "Unknown";
@@ -155,7 +162,9 @@ async function fetchEarthquake() {
         const d2 = (await r2.json());
         count2 = d2.count ?? 0;
     }
-    catch { /* ignore */ }
+    catch {
+        /* ignore */
+    }
     return {
         magnitude: mag,
         place,
@@ -179,11 +188,12 @@ async function fetchFlood() {
         const mmdd = `${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
         const r2 = await fetch(`https://waterservices.usgs.gov/nwis/stat/?format=json&sites=${USGS_FLOOD_SITE}&parameterCd=00065&statReportType=daily&statYearType=calendar`, { signal: AbortSignal.timeout(8000) });
         const d2 = (await r2.json());
-        const rec = (d2?.value?.timeSeries?.[0]?.values?.[0]?.value ?? [])
-            .find((v) => v.dateTime?.slice(5, 10) === mmdd);
+        const rec = (d2?.value?.timeSeries?.[0]?.values?.[0]?.value ?? []).find((v) => v.dateTime?.slice(5, 10) === mmdd);
         medianFt = rec ? parseFloat(rec.value) : null;
     }
-    catch { /* ignore */ }
+    catch {
+        /* ignore */
+    }
     const crossCheck = medianFt !== null ? ` | median: ${medianFt.toFixed(1)}ft` : "";
     return {
         gaugeFt,
@@ -196,7 +206,9 @@ async function fetchFlood() {
 async function fetchCropComposite() {
     const today = new Date();
     const end = today.toISOString().split("T")[0];
-    const start14 = new Date(today.getTime() - 14 * 86400000).toISOString().split("T")[0];
+    const start14 = new Date(today.getTime() - 14 * 86400000)
+        .toISOString()
+        .split("T")[0];
     const url = `https://archive-api.open-meteo.com/v1/archive` +
         `?latitude=${CROP_LAT}&longitude=${CROP_LON}` +
         `&daily=precipitation_sum,temperature_2m_max,temperature_2m_min` +
@@ -207,7 +219,9 @@ async function fetchCropComposite() {
     const daily = data.daily ?? {};
     const precip = daily.precipitation_sum ?? [];
     const tMax = daily.temperature_2m_max ?? [];
-    const avgPrecip = precip.length ? precip.reduce((a, b) => a + (b ?? 0), 0) / precip.length : 0;
+    const avgPrecip = precip.length
+        ? precip.reduce((a, b) => a + (b ?? 0), 0) / precip.length
+        : 0;
     const precipScore = Math.min(10000, Math.round((avgPrecip / 3.0) * 10000));
     const heatDays = tMax.filter((t) => t > 35).length;
     const heatScore = Math.max(0, 10000 - heatDays * 1000);
@@ -246,14 +260,21 @@ async function fetchHurricane() {
             }
         }
     }
-    catch { /* NHC may be rate-limited */ }
+    catch {
+        /* NHC may be rate-limited */
+    }
     let alertCount = 0;
     try {
-        const r2 = await fetch("https://api.weather.gov/alerts/active?event=Hurricane+Warning,Tropical+Storm+Warning", { headers: { "User-Agent": "myrmex-oracle/1.0" }, signal: AbortSignal.timeout(8000) });
+        const r2 = await fetch("https://api.weather.gov/alerts/active?event=Hurricane+Warning,Tropical+Storm+Warning", {
+            headers: { "User-Agent": "myrmex-oracle/1.0" },
+            signal: AbortSignal.timeout(8000),
+        });
         const d2 = (await r2.json());
         alertCount = (d2?.features ?? []).length;
     }
-    catch { /* ignore */ }
+    catch {
+        /* ignore */
+    }
     return {
         windKnots,
         name: stormName,
@@ -276,8 +297,12 @@ async function fetchStablecoinPrice() {
         const d2 = (await r2.json());
         usdcMarketCap = d2?.market_data?.market_cap?.usd ?? null;
     }
-    catch { /* ignore */ }
-    const mcStr = usdcMarketCap ? ` mcap=$${(usdcMarketCap / 1e9).toFixed(1)}B` : "";
+    catch {
+        /* ignore */
+    }
+    const mcStr = usdcMarketCap
+        ? ` mcap=$${(usdcMarketCap / 1e9).toFixed(1)}B`
+        : "";
     return {
         usdcBps,
         usdtBps,
@@ -293,7 +318,9 @@ async function fetchBridgeTvl() {
     const tvls = [];
     for (const protocol of BRIDGE_PROTOCOLS) {
         try {
-            const resp = await fetch(`https://api.llama.fi/tvl/${protocol}`, { signal: AbortSignal.timeout(8000) });
+            const resp = await fetch(`https://api.llama.fi/tvl/${protocol}`, {
+                signal: AbortSignal.timeout(8000),
+            });
             const text = await resp.text();
             const tvl = parseFloat(text);
             if (!isNaN(tvl) && tvl > 0) {
@@ -303,24 +330,31 @@ async function fetchBridgeTvl() {
                     rawPayload = JSON.stringify({ protocol, tvl: text.trim() });
             }
         }
-        catch { /* ignore */ }
+        catch {
+            /* ignore */
+        }
     }
     const tvlMillions = Math.round(totalTvl / 1000000);
     let tvlDrop = "";
     try {
-        const r2 = await fetch("https://api.llama.fi/protocol/wormhole", { signal: AbortSignal.timeout(8000) });
+        const r2 = await fetch("https://api.llama.fi/protocol/wormhole", {
+            signal: AbortSignal.timeout(8000),
+        });
         const d2 = (await r2.json());
         const chainTvls = d2?.currentChainTvls ?? {};
         const wormholeChainTvl = Object.values(chainTvls).reduce((a, b) => a + (typeof b === "number" ? b : 0), 0);
         const wormholeSlug = tvls.find((t) => t.startsWith("wormhole="));
         if (wormholeSlug && wormholeChainTvl > 0) {
             const slugTvl = parseFloat(wormholeSlug.replace(/.*=\$/, "").replace("B", "")) * 1e9;
-            const dropPct = ((slugTvl - wormholeChainTvl) / Math.max(slugTvl, wormholeChainTvl)) * 100;
+            const dropPct = ((slugTvl - wormholeChainTvl) / Math.max(slugTvl, wormholeChainTvl)) *
+                100;
             if (Math.abs(dropPct) > 30)
                 tvlDrop = ` WARN:tvl_discrepancy=${dropPct.toFixed(0)}%`;
         }
     }
-    catch { /* ignore */ }
+    catch {
+        /* ignore */
+    }
     return {
         tvlMillions,
         sources: `DeFiLlama: ${tvls.join(" ")} total=$${(totalTvl / 1e9).toFixed(2)}B${tvlDrop}`,

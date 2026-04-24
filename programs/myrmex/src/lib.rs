@@ -30,7 +30,12 @@ pub mod myrmex {
         min_premium_bps: u64,
         max_coverage_bps: u64,
     ) -> Result<()> {
-        instructions::initialize_pool_config::handler(ctx, oracle_authority, min_premium_bps, max_coverage_bps)
+        instructions::initialize_pool_config::handler(
+            ctx,
+            oracle_authority,
+            min_premium_bps,
+            max_coverage_bps,
+        )
     }
 
     pub fn post_oracle_report(
@@ -112,7 +117,13 @@ pub mod myrmex {
         description: [u8; 128],
         voting_duration_secs: i64,
     ) -> Result<()> {
-        instructions::create_proposal::handler(ctx, proposal_id, title, description, voting_duration_secs)
+        instructions::create_proposal::handler(
+            ctx,
+            proposal_id,
+            title,
+            description,
+            voting_duration_secs,
+        )
     }
 
     pub fn cast_vote(ctx: Context<CastVote>, proposal_id: u64, vote: bool) -> Result<()> {

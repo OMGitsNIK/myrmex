@@ -76,8 +76,12 @@ router.get("/", async (_req, res) => {
         return {
           pubkey: publicKey.toBase58(),
           poolType: acc.poolType,
-          poolName: V2_POOL_NAMES[acc.poolType] ??
-            Buffer.from(acc.poolName).toString("utf8").replace(/\0/g, "").trim(),
+          poolName:
+            V2_POOL_NAMES[acc.poolType] ??
+            Buffer.from(acc.poolName)
+              .toString("utf8")
+              .replace(/\0/g, "")
+              .trim(),
           totalLiquidity,
           totalLocked,
           available,

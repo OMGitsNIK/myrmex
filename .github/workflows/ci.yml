@@ -68,7 +68,13 @@ jobs:
       - name: Install Solana CLI (Agave 2.2.21)
         if: steps.cache-toolchain.outputs.cache-hit != 'true'
         run: |
-          sh -c "$(curl -sSfL https://release.anza.xyz/v2.2.21/install)"
+          mkdir -p "$HOME/.local/share/solana/install"
+          curl -sSfL \
+            "https://github.com/anza-xyz/agave/releases/download/v2.2.21/solana-release-x86_64-unknown-linux-gnu.tar.bz2" \
+            | tar xjC "$HOME/.local/share/solana/install"
+          ln -sfn \
+            "$HOME/.local/share/solana/install/solana-release" \
+            "$HOME/.local/share/solana/install/active_release"
 
       - name: Add Solana to PATH
         run: echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
@@ -77,7 +83,7 @@ jobs:
         if: steps.cache-toolchain.outputs.cache-hit != 'true'
         run: |
           sudo apt-get install -y pkg-config libssl-dev
-          cargo install avm --git https://github.com/coral-xyz/anchor --locked --force
+          cargo install avm --git https://github.com/coral-xyz/anchor --force
           avm install 0.32.1
           avm use 0.32.1
 

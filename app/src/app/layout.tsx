@@ -11,10 +11,9 @@ export const metadata: Metadata = {
 };
 
 // Load all wallet-related UI client-side only — no SSR
-const ClientProviders = dynamic(
-  () => import("@/components/ClientProviders"),
-  { ssr: false }
-);
+const ClientProviders = dynamic(() => import("@/components/ClientProviders"), {
+  ssr: false,
+});
 
 export default function RootLayout({
   children,
@@ -23,7 +22,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${inter.className} bg-gray-950 text-white min-h-screen`}>
+      <body
+        className={`${inter.className} bg-gray-950 text-white min-h-screen`}
+      >
         <ClientProviders>{children}</ClientProviders>
       </body>
     </html>

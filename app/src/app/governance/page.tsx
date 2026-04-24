@@ -7,7 +7,9 @@ import { PublicKey } from "@solana/web3.js";
 import { toast } from "sonner";
 import { API_URL } from "@/lib/constants";
 
-const PROGRAM_ID = new PublicKey("9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan");
+const PROGRAM_ID = new PublicKey(
+  "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan"
+);
 
 interface Proposal {
   pubkey: string;
@@ -33,15 +35,24 @@ function timeLeft(endsAt: number): string {
 
 function statusBadge(status: string) {
   const cls =
-    status === "active" ? "bg-[var(--accent-dim)] text-[var(--accent)]"
-    : status === "passed" || status === "executed" ? "bg-blue-500/20 text-blue-400"
-    : "bg-red-500/20 text-red-400";
+    status === "active"
+      ? "bg-[var(--accent-dim)] text-[var(--accent)]"
+      : status === "passed" || status === "executed"
+      ? "bg-blue-500/20 text-blue-400"
+      : "bg-red-500/20 text-red-400";
   const label =
-    status === "active" ? "● Active"
-    : status === "passed" ? "✓ Passed"
-    : status === "executed" ? "✓ Executed"
-    : "✗ Rejected";
-  return <span className={`text-xs px-2 py-0.5 rounded font-medium ${cls}`}>{label}</span>;
+    status === "active"
+      ? "● Active"
+      : status === "passed"
+      ? "✓ Passed"
+      : status === "executed"
+      ? "✓ Executed"
+      : "✗ Rejected";
+  return (
+    <span className={`text-xs px-2 py-0.5 rounded font-medium ${cls}`}>
+      {label}
+    </span>
+  );
 }
 
 export default function GovernancePage() {
@@ -69,37 +80,53 @@ export default function GovernancePage() {
     try {
       const res = await fetch(`${API_URL}/api/proposals`);
       if (res.ok) setProposals(await res.json());
-    } catch { /* noop */ }
-    finally { setLoadingProposals(false); }
+    } catch {
+      /* noop */
+    } finally {
+      setLoadingProposals(false);
+    }
   }, []);
 
   // Check on-chain VoteRecord accounts so vote state survives page refresh
-  const checkVoteRecords = useCallback(async (proposalList: Proposal[]) => {
-    if (!wallet || !program || proposalList.length === 0) return;
-    setCheckingVotes(true);
-    const newVotes: Record<number, "for" | "against"> = {};
-    await Promise.allSettled(
-      proposalList.map(async (p) => {
-        const proposalId = new anchor.BN(p.id);
-        const [proposalPda] = PublicKey.findProgramAddressSync(
-          [Buffer.from("proposal"), proposalId.toArrayLike(Buffer, "le", 8)],
-          PROGRAM_ID
-        );
-        const [voteRecordPda] = PublicKey.findProgramAddressSync(
-          [Buffer.from("vote_record"), proposalPda.toBuffer(), wallet.publicKey.toBuffer()],
-          PROGRAM_ID
-        );
-        try {
-          const record = await (program as any).account.voteRecord.fetchNullable(voteRecordPda);
-          if (record) newVotes[p.id] = record.vote ? "for" : "against";
-        } catch { /* no record = not voted */ }
-      })
-    );
-    setVotes(newVotes);
-    setCheckingVotes(false);
-  }, [wallet, program]);
+  const checkVoteRecords = useCallback(
+    async (proposalList: Proposal[]) => {
+      if (!wallet || !program || proposalList.length === 0) return;
+      setCheckingVotes(true);
+      const newVotes: Record<number, "for" | "against"> = {};
+      await Promise.allSettled(
+        proposalList.map(async (p) => {
+          const proposalId = new anchor.BN(p.id);
+          const [proposalPda] = PublicKey.findProgramAddressSync(
+            [Buffer.from("proposal"), proposalId.toArrayLike(Buffer, "le", 8)],
+            PROGRAM_ID
+          );
+          const [voteRecordPda] = PublicKey.findProgramAddressSync(
+            [
+              Buffer.from("vote_record"),
+              proposalPda.toBuffer(),
+              wallet.publicKey.toBuffer(),
+            ],
+            PROGRAM_ID
+          );
+          try {
+            const record = await (
+              program as any
+            ).account.voteRecord.fetchNullable(voteRecordPda);
+            if (record) newVotes[p.id] = record.vote ? "for" : "against";
+          } catch {
+            /* no record = not voted */
+          }
+        })
+      );
+      setVotes(newVotes);
+      setCheckingVotes(false);
+    },
+    [wallet, program]
+  );
 
-  useEffect(() => { fetchProposals(); }, [fetchProposals]);
+  useEffect(() => {
+    fetchProposals();
+  }, [fetchProposals]);
 
   // Re-check vote state whenever wallet or proposals change
   useEffect(() => {
@@ -107,7 +134,10 @@ export default function GovernancePage() {
   }, [proposals, wallet, checkVoteRecords]);
 
   const handleStake = async () => {
-    if (!program || !wallet) { toast.error("Connect wallet first"); return; }
+    if (!program || !wallet) {
+      toast.error("Connect wallet first");
+      return;
+    }
     setStaking(true);
     try {
       const [stakeAccountPda] = anchor.web3.PublicKey.findProgramAddressSync(
@@ -123,19 +153,29 @@ export default function GovernancePage() {
         })
         .rpc();
       setStaked(true);
-      toast.success(`Staked ${stakeAmount} MYR — you can now vote on active proposals`);
+      toast.success(
+        `Staked ${stakeAmount} MYR — you can now vote on active proposals`
+      );
     } catch (e: unknown) {
       const err = e as Error;
-      if (err.message?.includes("Account does not exist") || err.message?.includes("not found")) {
+      if (
+        err.message?.includes("Account does not exist") ||
+        err.message?.includes("not found")
+      ) {
         toast.info("Stake account not yet initialized on this wallet");
       } else {
         toast.error("Stake failed", { description: err.message });
       }
-    } finally { setStaking(false); }
+    } finally {
+      setStaking(false);
+    }
   };
 
   const handleVote = async (proposal: Proposal, side: "for" | "against") => {
-    if (!wallet || !program) { toast.error("Connect wallet first"); return; }
+    if (!wallet || !program) {
+      toast.error("Connect wallet first");
+      return;
+    }
     setVoting(proposal.id);
     try {
       const proposalId = new anchor.BN(proposal.id);
@@ -144,7 +184,11 @@ export default function GovernancePage() {
         PROGRAM_ID
       );
       const [voteRecordPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("vote_record"), proposalPda.toBuffer(), wallet.publicKey.toBuffer()],
+        [
+          Buffer.from("vote_record"),
+          proposalPda.toBuffer(),
+          wallet.publicKey.toBuffer(),
+        ],
         PROGRAM_ID
       );
       await (program as any).methods
@@ -157,7 +201,9 @@ export default function GovernancePage() {
         })
         .rpc();
       setVotes((prev) => ({ ...prev, [proposal.id]: side }));
-      toast.success(`Voted ${side === "for" ? "✓ For" : "✗ Against"} MIP-${proposal.id}`);
+      toast.success(
+        `Voted ${side === "for" ? "✓ For" : "✗ Against"} MIP-${proposal.id}`
+      );
     } catch (e: unknown) {
       const msg = (e as Error).message ?? "";
       const alreadyVoted =
@@ -166,19 +212,32 @@ export default function GovernancePage() {
         msg.includes("0x0") ||
         msg.includes("AccountAlreadyInitialized");
       if (alreadyVoted) {
-        toast.error("Already voted — each wallet can only vote once per proposal");
+        toast.error(
+          "Already voted — each wallet can only vote once per proposal"
+        );
         // Sync on-chain state so UI reflects the correct voted status
         checkVoteRecords(proposals);
       } else {
         toast.error("Vote failed", { description: msg });
       }
-    } finally { setVoting(null); }
+    } finally {
+      setVoting(null);
+    }
   };
 
   const handleCreate = async () => {
-    if (!program || !wallet) { toast.error("Connect wallet first"); return; }
-    if (!newTitle.trim()) { toast.error("Title required"); return; }
-    if (!newDescription.trim()) { toast.error("Description required"); return; }
+    if (!program || !wallet) {
+      toast.error("Connect wallet first");
+      return;
+    }
+    if (!newTitle.trim()) {
+      toast.error("Title required");
+      return;
+    }
+    if (!newDescription.trim()) {
+      toast.error("Description required");
+      return;
+    }
 
     setCreating(true);
     try {
@@ -216,16 +275,20 @@ export default function GovernancePage() {
       setTimeout(fetchProposals, 2000);
     } catch (e: unknown) {
       toast.error("Create failed", { description: (e as Error).message });
-    } finally { setCreating(false); }
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
     <div className="space-y-10">
       <div>
-        <h1 className="text-3xl font-bold text-white tracking-tight">Governance</h1>
+        <h1 className="text-3xl font-bold text-white tracking-tight">
+          Governance
+        </h1>
         <p className="text-gray-400 mt-2">
-          Stake MYR tokens to vote on protocol parameters, new pool types, and oracle configuration.
-          All proposals and votes are on-chain.
+          Stake MYR tokens to vote on protocol parameters, new pool types, and
+          oracle configuration. All proposals and votes are on-chain.
         </p>
       </div>
 
@@ -233,11 +296,14 @@ export default function GovernancePage() {
       <div className="card p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-white">Stake MYR</h2>
-          <span className="text-xs text-gray-500 bg-[var(--surface-2)] px-2 py-1 rounded">7-day lock</span>
+          <span className="text-xs text-gray-500 bg-[var(--surface-2)] px-2 py-1 rounded">
+            7-day lock
+          </span>
         </div>
         <p className="text-sm text-gray-400">
-          Stake MYR to earn a share of protocol fees during the lock period.
-          Any connected wallet can vote on proposals — staking is separate from governance voting.
+          Stake MYR to earn a share of protocol fees during the lock period. Any
+          connected wallet can vote on proposals — staking is separate from
+          governance voting.
         </p>
         <div className="flex gap-3">
           <input
@@ -262,7 +328,11 @@ export default function GovernancePage() {
             Staked — earning protocol fee share during lock period
           </div>
         )}
-        {!wallet && <p className="text-xs text-gray-600">Connect wallet to stake and vote.</p>}
+        {!wallet && (
+          <p className="text-xs text-gray-600">
+            Connect wallet to stake and vote.
+          </p>
+        )}
       </div>
 
       {/* Proposals header */}
@@ -270,10 +340,14 @@ export default function GovernancePage() {
         <h2 className="text-lg font-semibold text-white">
           Proposals
           {!loadingProposals && (
-            <span className="ml-2 text-sm font-normal text-gray-500">({proposals.length} on-chain)</span>
+            <span className="ml-2 text-sm font-normal text-gray-500">
+              ({proposals.length} on-chain)
+            </span>
           )}
           {checkingVotes && (
-            <span className="ml-2 text-xs font-normal text-gray-600">checking votes…</span>
+            <span className="ml-2 text-xs font-normal text-gray-600">
+              checking votes…
+            </span>
           )}
         </h2>
         <button
@@ -287,7 +361,9 @@ export default function GovernancePage() {
       {/* Create proposal form */}
       {showCreate && (
         <div className="card p-6 space-y-4 border border-[var(--accent)]/30">
-          <h3 className="font-semibold text-white text-sm">New On-Chain Proposal</h3>
+          <h3 className="font-semibold text-white text-sm">
+            New On-Chain Proposal
+          </h3>
           <label className="block space-y-1">
             <span className="text-xs text-gray-500">Title (max 63 chars)</span>
             <input
@@ -299,7 +375,9 @@ export default function GovernancePage() {
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs text-gray-500">Description (max 127 chars)</span>
+            <span className="text-xs text-gray-500">
+              Description (max 127 chars)
+            </span>
             <textarea
               value={newDescription}
               onChange={(e) => setNewDescription(e.target.value)}
@@ -310,12 +388,19 @@ export default function GovernancePage() {
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs text-gray-500">Voting duration (days, 1–30)</span>
+            <span className="text-xs text-gray-500">
+              Voting duration (days, 1–30)
+            </span>
             <input
               type="number"
               value={durationDays}
-              onChange={(e) => setDurationDays(Math.min(30, Math.max(1, Number(e.target.value))))}
-              min={1} max={30}
+              onChange={(e) =>
+                setDurationDays(
+                  Math.min(30, Math.max(1, Number(e.target.value)))
+                )
+              }
+              min={1}
+              max={30}
               className="w-32 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white text-sm focus:border-[var(--accent)]/50 outline-none"
             />
           </label>
@@ -326,16 +411,24 @@ export default function GovernancePage() {
           >
             {creating ? "Creating…" : "Create Proposal On-Chain"}
           </button>
-          {!wallet && <p className="text-xs text-gray-600">Connect wallet to create a proposal.</p>}
+          {!wallet && (
+            <p className="text-xs text-gray-600">
+              Connect wallet to create a proposal.
+            </p>
+          )}
         </div>
       )}
 
       {/* Proposal list */}
       <div className="space-y-4">
         {loadingProposals ? (
-          <div className="card p-6 text-center text-gray-500 text-sm">Loading proposals from chain…</div>
+          <div className="card p-6 text-center text-gray-500 text-sm">
+            Loading proposals from chain…
+          </div>
         ) : proposals.length === 0 ? (
-          <div className="card p-6 text-center text-gray-500 text-sm">No proposals found on-chain yet.</div>
+          <div className="card p-6 text-center text-gray-500 text-sm">
+            No proposals found on-chain yet.
+          </div>
         ) : (
           proposals.map((p) => {
             const total = p.votes_for + p.votes_against;
@@ -347,7 +440,9 @@ export default function GovernancePage() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500 font-mono">MIP-{p.id}</span>
+                      <span className="text-xs text-gray-500 font-mono">
+                        MIP-{p.id}
+                      </span>
                       {statusBadge(p.status)}
                     </div>
                     <h3 className="text-white font-semibold">{p.title}</h3>
@@ -357,19 +452,29 @@ export default function GovernancePage() {
                   </span>
                 </div>
 
-                <p className="text-sm text-gray-400 leading-relaxed">{p.description}</p>
+                <p className="text-sm text-gray-400 leading-relaxed">
+                  {p.description}
+                </p>
 
                 <div className="space-y-1.5">
                   <div className="flex justify-between text-xs text-gray-500">
                     <span>For: {p.votes_for + (myVote === "for" ? 1 : 0)}</span>
-                    <span>Against: {p.votes_against + (myVote === "against" ? 1 : 0)}</span>
+                    <span>
+                      Against:{" "}
+                      {p.votes_against + (myVote === "against" ? 1 : 0)}
+                    </span>
                   </div>
                   <div className="h-1.5 bg-[var(--surface-2)] rounded-full overflow-hidden flex">
-                    <div className="h-full bg-[var(--accent)] transition-all" style={{ width: `${forPct}%` }} />
+                    <div
+                      className="h-full bg-[var(--accent)] transition-all"
+                      style={{ width: `${forPct}%` }}
+                    />
                     <div className="h-full bg-red-500/60 flex-1" />
                   </div>
                   <div className="flex items-center justify-between text-xs text-gray-600">
-                    <span>{forPct.toFixed(1)}% in favor · Quorum: 100 votes</span>
+                    <span>
+                      {forPct.toFixed(1)}% in favor · Quorum: 100 votes
+                    </span>
                     <a
                       href={`https://explorer.solana.com/address/${p.pubkey}?cluster=devnet`}
                       target="_blank"
@@ -385,25 +490,35 @@ export default function GovernancePage() {
                   <div className="flex gap-3">
                     <button
                       onClick={() => handleVote(p, "for")}
-                      disabled={voting === p.id || myVote !== undefined || checkingVotes}
+                      disabled={
+                        voting === p.id || myVote !== undefined || checkingVotes
+                      }
                       className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
                         myVote === "for"
                           ? "bg-[var(--accent-dim)] border border-[var(--accent)] text-[var(--accent)]"
                           : "border border-[var(--border)] text-gray-300 hover:border-[var(--accent)]/50 disabled:opacity-40"
                       }`}
                     >
-                      {myVote === "for" ? "✓ Voted For" : voting === p.id ? "Voting…" : "Vote For"}
+                      {myVote === "for"
+                        ? "✓ Voted For"
+                        : voting === p.id
+                        ? "Voting…"
+                        : "Vote For"}
                     </button>
                     <button
                       onClick={() => handleVote(p, "against")}
-                      disabled={voting === p.id || myVote !== undefined || checkingVotes}
+                      disabled={
+                        voting === p.id || myVote !== undefined || checkingVotes
+                      }
                       className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
                         myVote === "against"
                           ? "bg-red-500/10 border border-red-500/60 text-red-400"
                           : "border border-[var(--border)] text-gray-300 hover:border-red-500/40 disabled:opacity-40"
                       }`}
                     >
-                      {myVote === "against" ? "✗ Voted Against" : "Vote Against"}
+                      {myVote === "against"
+                        ? "✗ Voted Against"
+                        : "Vote Against"}
                     </button>
                   </div>
                 )}
@@ -416,13 +531,20 @@ export default function GovernancePage() {
       {/* Explainer */}
       <div className="card p-6 space-y-2 text-sm text-gray-400">
         <p>
-          <span className="text-white font-medium">On-chain instructions: </span>
-          <code className="text-[var(--accent)]">create_proposal</code> initializes a PDA keyed by proposal ID with a configurable voting window.
-          <code className="text-[var(--accent)] ml-1">cast_vote</code> records your vote — any connected wallet can vote, one vote per tx.
-          <code className="text-[var(--accent)] ml-1">stake_myr</code> locks tokens for protocol fee sharing (separate from voting).
+          <span className="text-white font-medium">
+            On-chain instructions:{" "}
+          </span>
+          <code className="text-[var(--accent)]">create_proposal</code>{" "}
+          initializes a PDA keyed by proposal ID with a configurable voting
+          window.
+          <code className="text-[var(--accent)] ml-1">cast_vote</code> records
+          your vote — any connected wallet can vote, one vote per tx.
+          <code className="text-[var(--accent)] ml-1">stake_myr</code> locks
+          tokens for protocol fee sharing (separate from voting).
         </p>
         <p>
-          All proposal state lives on-chain. Proposals and votes are permanent and publicly verifiable.
+          All proposal state lives on-chain. Proposals and votes are permanent
+          and publicly verifiable.
         </p>
       </div>
     </div>

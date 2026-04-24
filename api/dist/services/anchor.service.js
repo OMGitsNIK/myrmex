@@ -44,7 +44,11 @@ let _program = null;
 let _provider = null;
 function getAnchorProgram() {
     if (_program && _provider)
-        return { program: _program, provider: _provider, connection: _provider.connection };
+        return {
+            program: _program,
+            provider: _provider,
+            connection: _provider.connection,
+        };
     const connection = new web3_js_1.Connection(RPC_URL, "confirmed");
     let keypair;
     if (process.env.SERVER_KEYPAIR) {
