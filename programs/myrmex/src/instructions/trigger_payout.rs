@@ -80,7 +80,10 @@ pub fn handler(ctx: Context<TriggerPayout>) -> Result<()> {
         let age = clock
             .unix_timestamp
             .saturating_sub(oracle_report.reported_at);
-        require!(age <= OracleReport::MAX_AGE_SECS, MyrmexError::OracleReportStale);
+        require!(
+            age <= OracleReport::MAX_AGE_SECS,
+            MyrmexError::OracleReportStale
+        );
 
         let policy = &ctx.accounts.policy;
 

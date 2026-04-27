@@ -21,84 +21,83 @@ export interface Quote {
   risk_score: number;
   confidence: "high" | "medium" | "low";
   breakdown: Record<string, unknown>;
-}
-
-// Local rate estimates used when the pricing API is unreachable.
-// These are flat-rate approximations — NOT from the actuarial model.
-function localFallbackQuote(params: QuoteRequest): Quote {
-  // Rates are floored at 5% (500 bps) to match on-chain minPremiumBps
-  const base: Record<string, number> = {
-    earthquake: 0.055,
-    flood: 0.06,
-    crop_multifactor: 0.075,
-    hurricane: 0.08,
-    stablecoin_depeg: 0.05,
-    bridge_hack: 0.065,
-  };
-  const rate = base[params.coverage_type] ?? 0.03;
-  const durationFactor = Math.min(params.duration_days / 30, 3);
-  const premium_pct = rate * durationFactor;
-  const premium_usdc = parseFloat(
-    (params.payout_amount_usdc * premium_pct).toFixed(2)
-  );
-  const risk_score = Math.round(premium_pct * 600);
-  return {
-    premium_usdc,
-    premium_pct: parseFloat((premium_pct * 100).toFixed(3)),
-    risk_score: Math.min(risk_score, 99),
-    confidence: "medium",
-    breakdown: { source: "local_fallback" },
-  };
+  quote_signature?: number[];
+  quote_expiry?: number;
+  pricing_authority?: string;
 }
 
 export const FALLBACK_WARNING =
   "Pricing API offline — showing estimated flat rates. Purchase is disabled until the API is reachable.";
 
-export function usePremiumQuote(params: QuoteRequest | null) {
+export function usePremiumQuote(params: any) {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isFallback, setIsFallback] = useState(false);
 
   useEffect(() => {
-    if (!params || params.payout_amount_usdc <= 0) {
+    if (!params?.payout_amount_usdc || params.payout_amount_usdc <= 0) {
       setQuote(null);
       return;
     }
 
-    const controller = new AbortController();
-    const timer = setTimeout(async () => {
+    let cancelled = false;
+    const fetchQuote = async () => {
       setLoading(true);
       setError(null);
       setIsFallback(false);
+
       try {
-        const res = await fetch(`${PRICING_API}/quote`, {
+        const res = await fetch(`${PRICING_API}/api/quote`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(params),
-          signal: controller.signal,
         });
-        if (!res.ok) throw new Error(await res.text());
-        const data: Quote = await res.json();
-        setQuote(data);
-      } catch (e: unknown) {
-        const err = e as Error;
-        if (err.name === "AbortError") return;
-        // Pricing API unreachable — use local flat-rate fallback and flag it
-        setQuote(localFallbackQuote(params));
-        setIsFallback(true);
-        setError(FALLBACK_WARNING);
-      } finally {
-        setLoading(false);
-      }
-    }, 400);
 
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || "Failed to fetch quote");
+        }
+
+        const data = await res.json();
+        if (!cancelled) {
+          setQuote(data);
+        }
+      } catch (err: any) {
+        if (cancelled) return;
+        console.error("Pricing API Error:", err);
+        setError(FALLBACK_WARNING);
+        setIsFallback(true);
+
+        // Fallback estimate: 1% flat rate for demo UI
+        setQuote({
+          premium_usdc: params.payout_amount_usdc * 0.01,
+          premium_pct: 1.0,
+          risk_score: 1.0,
+          confidence: "low",
+          breakdown: { source: "local_fallback" },
+        });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(params)]);
+
+    const timer = setTimeout(fetchQuote, 500);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [
+    params?.coverage_type,
+    params?.payout_amount_usdc,
+    params?.duration_days,
+    params?.min_magnitude,
+    params?.gauge_threshold_ft,
+    params?.score_threshold,
+    params?.wind_threshold_knots,
+    params?.depeg_threshold_bps,
+    params?.tvl_drop_threshold_pct,
+  ]);
 
   return { quote, loading, error, isFallback };
 }

@@ -16,7 +16,7 @@ import {
   getAssociatedTokenAddressSync,
   createAssociatedTokenAccountIdempotentInstruction,
 } from "@solana/spl-token";
-import { PublicKey, Transaction } from "@solana/web3.js";
+import { Ed25519Program, PublicKey, Transaction } from "@solana/web3.js";
 import { toast } from "sonner";
 
 interface PolicySuccess {
@@ -170,15 +170,21 @@ export default function BuyPage() {
         comparison: selectedType.comparison,
       };
 
-      const tx = await program.methods
-        .createPolicy(
-          selectedType.id,
-          new anchor.BN(Math.floor(payoutAmount * 1_000_000)),
-          new anchor.BN(Math.floor(effectivePremiumUsdc * 1_000_000)),
+      const { BN } = await import("@coral-xyz/anchor");
+      const sigArray = quote.quote_signature || new Array(64).fill(0);
+      const expiry = new BN(quote.quote_expiry || 0);
+
+      // Create the main instruction
+      const mainIx = await (program as any).methods
+        .createPolicy({
+          coverageType: selectedType.id,
+          payoutAmount: new BN(Math.floor(payoutAmount * 1_000_000)),
+          premiumAmount: new BN(Math.floor(effectivePremiumUsdc * 1_000_000)),
           triggerCondition,
-          new anchor.BN(Math.floor(Date.now() / 1000) + durationDays * 86400),
-          nonce
-        )
+          expiresAt: new BN(Math.floor(Date.now() / 1000) + durationDays * 86400),
+          nonce,
+          quoteExpiry: expiry,
+        })
         .accounts({
           policyholder: wallet.publicKey,
           policy: policyPda,
@@ -187,8 +193,31 @@ export default function BuyPage() {
           policyholderUsdc,
           poolVault,
           usdcMint: USDC_MINT,
+          instructionsSysvar: "Sysvar1nstructions1111111111111111111111111",
+          tokenProgram: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          associatedTokenProgram: "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+          systemProgram: "11111111111111111111111111111111",
         })
-        .rpc();
+        .instruction();
+
+      // Build message for Ed25519 verification
+      // Match the API format: [pool, coverage_type, payout, premium, expiry]
+      const msg = Buffer.concat([
+        poolPda.toBuffer(),
+        Buffer.from([selectedType.id]),
+        new BN(Math.floor(payoutAmount * 1_000_000)).toArrayLike(Buffer, "le", 8),
+        new BN(Math.floor(effectivePremiumUsdc * 1_000_000)).toArrayLike(Buffer, "le", 8),
+        expiry.toArrayLike(Buffer, "le", 8),
+      ]);
+
+      const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
+        publicKey: new PublicKey(quote.pricing_authority || matchingPool.poolConfig.pricingAuthority).toBytes(),
+        message: msg,
+        signature: new Uint8Array(sigArray),
+      });
+
+      const txObj = new Transaction().add(ed25519Ix).add(mainIx);
+      const tx = await (program.provider as any).sendAndConfirm(txObj);
 
       setPolicies((prev) => [
         {

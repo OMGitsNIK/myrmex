@@ -10,8 +10,10 @@ interface StatsResponse {
   total_tvl_usdc: number;
   active_policies: number;
   total_pools: number;
-  payouts_executed?: number;
+  total_premium_accrued?: number;
+  total_payouts_executed?: number;
   total_events?: number;
+  last_sync_time?: string;
 }
 
 interface PoolResponse {
@@ -173,21 +175,21 @@ export default function AdminPage() {
           loading={loading}
         />
         <StatCard
-          label="Active Policies"
-          value={`${stats?.active_policies ?? 0}`}
-          detail="Policies currently backed by pool liquidity"
+          label="Total Premium Accrued"
+          value={`$${formatUsdc(lamportsToUsdc(stats?.total_premium_accrued ?? 0))}`}
+          detail="Protocol revenue from indexed events"
           loading={loading}
         />
         <StatCard
-          label="Total Pools"
-          value={`${stats?.total_pools ?? 0}`}
-          detail="Pools discovered from on-chain state"
+          label="Total Payouts"
+          value={`$${formatUsdc(lamportsToUsdc(stats?.total_payouts_executed ?? 0))}`}
+          detail="Cumulative payouts to policyholders"
           loading={loading}
         />
         <StatCard
           label="Avg Pool Utilization"
           value={`${avgPoolUtilization.toFixed(1)}%`}
-          detail="Average locked/liquidity ratio across all pools"
+          detail="Average locked/liquidity ratio"
           loading={loading}
         />
       </div>
@@ -260,16 +262,16 @@ export default function AdminPage() {
         <div className="space-y-4">
           <div className="card p-6 space-y-4">
             <div>
-              <h2 className="font-semibold text-white">Payout History</h2>
+              <h2 className="font-semibold text-white">Indexer Status</h2>
               <p className="mt-1 text-sm text-gray-400">
-                Indexed payout activity from the REST API stats endpoint.
+                Data freshness and event statistics.
               </p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
               <MiniMetric
-                label="Payouts Executed"
-                value={`${stats?.payouts_executed ?? 0}`}
+                label="Last Sync"
+                value={stats?.last_sync_time ? new Date(stats.last_sync_time).toLocaleTimeString() : "Pending"}
                 loading={loading}
               />
               <MiniMetric
@@ -312,6 +314,7 @@ function UpdatePoolConfigPanel({ pools }: { pools: PoolResponse[] }) {
   const [selectedPool, setSelectedPool] = useState("");
   const [minPremiumBps, setMinPremiumBps] = useState("500");
   const [maxCoverageBps, setMaxCoverageBps] = useState("8000");
+  const [pricingAuth, setPricingAuth] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const handleUpdate = async () => {
@@ -319,6 +322,9 @@ function UpdatePoolConfigPanel({ pools }: { pools: PoolResponse[] }) {
     if (!selectedPool) { toast.error("Select a pool"); return; }
     const minBps = parseInt(minPremiumBps);
     const maxBps = parseInt(maxCoverageBps);
+    let pricingPk: PublicKey;
+    try { pricingPk = new PublicKey(pricingAuth); } catch { toast.error("Invalid pricing authority pubkey"); return; }
+
     if (!isFinite(minBps) || minBps < 0 || minBps > 10000) { toast.error("min_premium_bps must be 0–10000"); return; }
     if (!isFinite(maxBps) || maxBps < 1 || maxBps > 10000) { toast.error("max_coverage_bps must be 1–10000"); return; }
 
@@ -331,7 +337,7 @@ function UpdatePoolConfigPanel({ pools }: { pools: PoolResponse[] }) {
       );
       const { BN } = await import("@coral-xyz/anchor");
       await (program as any).methods
-        .updatePoolConfig(new BN(minBps), new BN(maxBps))
+        .updatePoolConfig(new BN(minBps), new BN(maxBps), pricingPk)
         .accounts({ authority: wallet.publicKey, pool: poolPk, poolConfig: poolConfigPda })
         .rpc();
       toast.success("pool_config updated on-chain");
@@ -347,7 +353,7 @@ function UpdatePoolConfigPanel({ pools }: { pools: PoolResponse[] }) {
       <div>
         <h2 className="font-semibold text-white">Update Pool Config</h2>
         <p className="text-xs text-gray-500 mt-1">
-          Adjust premium floor / coverage cap. Requires pool authority wallet.
+          Adjust premium floor / coverage cap / pricing authority. Requires pool authority wallet.
         </p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -365,6 +371,16 @@ function UpdatePoolConfigPanel({ pools }: { pools: PoolResponse[] }) {
               </option>
             ))}
           </select>
+        </label>
+        <label className="space-y-1">
+          <span className="text-xs text-gray-500">Pricing Authority (pubkey)</span>
+          <input
+            type="text"
+            value={pricingAuth}
+            onChange={(e) => setPricingAuth(e.target.value)}
+            placeholder="Pricing API wallet..."
+            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white text-sm font-mono focus:border-[var(--accent)]/50 outline-none"
+          />
         </label>
         <label className="space-y-1">
           <span className="text-xs text-gray-500">Min Premium bps (0–10000)</span>

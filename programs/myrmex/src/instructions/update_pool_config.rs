@@ -1,6 +1,6 @@
-use anchor_lang::prelude::*;
-use crate::state::{PoolConfig, RiskPool};
 use crate::errors::MyrmexError;
+use crate::state::{PoolConfig, RiskPool};
+use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 pub struct UpdatePoolConfig<'info> {
@@ -24,6 +24,7 @@ pub fn handler(
     ctx: Context<UpdatePoolConfig>,
     min_premium_bps: u64,
     max_coverage_bps: u64,
+    pricing_authority: Pubkey,
 ) -> Result<()> {
     require!(
         (50..=10_000).contains(&min_premium_bps),
@@ -42,6 +43,7 @@ pub fn handler(
     let config = &mut ctx.accounts.pool_config;
     config.min_premium_bps = min_premium_bps;
     config.max_coverage_bps = max_coverage_bps;
+    config.pricing_authority = pricing_authority;
 
     Ok(())
 }

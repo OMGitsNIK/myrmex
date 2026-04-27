@@ -11,7 +11,12 @@ let _program: anchor.Program | null = null;
 let _provider: anchor.AnchorProvider | null = null;
 
 export function getAnchorProgram() {
-  if (_program && _provider) return { program: _program, provider: _provider, connection: _provider.connection };
+  if (_program && _provider)
+    return {
+      program: _program,
+      provider: _provider,
+      connection: _provider.connection,
+    };
 
   const connection = new Connection(RPC_URL, "confirmed");
 
@@ -24,7 +29,9 @@ export function getAnchorProgram() {
     if (process.env.NODE_ENV === "production") {
       throw new Error("SERVER_KEYPAIR env var is required in production");
     }
-    console.warn("[anchor.service] SERVER_KEYPAIR not set — falling back to ~/.config/solana/id.json (dev only)");
+    console.warn(
+      "[anchor.service] SERVER_KEYPAIR not set — falling back to ~/.config/solana/id.json (dev only)"
+    );
     const keyPath = path.join(
       process.env.HOME || "~",
       ".config/solana/id.json"

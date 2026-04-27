@@ -1,6 +1,6 @@
-use anchor_lang::prelude::*;
 use crate::errors::MyrmexError;
 use crate::state::{OracleReport, PoolConfig, RiskPool};
+use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 #[instruction(reported_value: i64, scope_hash: [u8; 32], description: [u8; 192])]

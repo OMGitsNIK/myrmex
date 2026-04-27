@@ -110,7 +110,11 @@ async function runFullFlow() {
   console.log("   Pool:", poolPda.toBase58());
 
   await (program as any).methods
-    .initializePoolConfig(oracle.publicKey, new anchor.BN(500), new anchor.BN(8000))
+    .initializePoolConfig(
+      oracle.publicKey,
+      new anchor.BN(500),
+      new anchor.BN(8000)
+    )
     .accounts({
       authority: admin.publicKey,
       pool: poolPda,

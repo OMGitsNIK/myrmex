@@ -29,12 +29,14 @@ const app = express();
 app.use(helmet());
 
 // CORS
-app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
-    cb(new Error(`CORS: origin ${origin} not allowed`));
-  },
-}));
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+      cb(new Error(`CORS: origin ${origin} not allowed`));
+    },
+  })
+);
 
 // Limit each IP to 120 requests per minute across all routes
 const globalLimiter = rateLimit({

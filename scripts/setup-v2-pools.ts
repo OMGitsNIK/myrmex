@@ -36,9 +36,9 @@ const USDC_MINT = new anchor.web3.PublicKey(
 const V2_POOLS = [
   {
     type: 0,
-    name: "Earthquake-Pac",  // 14 chars — fits in 32-byte name
+    name: "Earthquake-Pac", // 14 chars — fits in 32-byte name
     seedUsdc: 5_000,
-    minPremiumBps: 200,   // 2% — lower because quakes are high-severity, rare
+    minPremiumBps: 200, // 2% — lower because quakes are high-severity, rare
     maxCoverageBps: 5000,
     desc: "Pacific Ring of Fire M5.0+",
   },
@@ -70,7 +70,7 @@ const V2_POOLS = [
     type: 4,
     name: "USDC-Depeg",
     seedUsdc: 10_000,
-    minPremiumBps: 50,    // 0.5% — depeg events are rare, high liquidity needed
+    minPremiumBps: 50, // 0.5% — depeg events are rare, high liquidity needed
     maxCoverageBps: 9000,
     desc: "USDC/USDT price below $0.97",
   },
@@ -78,7 +78,7 @@ const V2_POOLS = [
     type: 5,
     name: "Bridge-Hack",
     seedUsdc: 5_000,
-    minPremiumBps: 100,   // 1%
+    minPremiumBps: 100, // 1%
     maxCoverageBps: 7000,
     desc: "DeFiLlama bridge TVL collapse detection",
   },
@@ -86,13 +86,22 @@ const V2_POOLS = [
 
 function nameToBytes(name: string): number[] {
   const buf = new Uint8Array(32);
-  name.slice(0, 32).split("").forEach((c, i) => (buf[i] = c.charCodeAt(0)));
+  name
+    .slice(0, 32)
+    .split("")
+    .forEach((c, i) => (buf[i] = c.charCodeAt(0)));
   return Array.from(buf);
 }
 
 async function main() {
-  const adminPath = path.join(process.env.HOME || "~", ".config/solana/id.json");
-  const oraclePath = path.join(process.env.HOME || "~", ".config/solana/oracle.json");
+  const adminPath = path.join(
+    process.env.HOME || "~",
+    ".config/solana/id.json"
+  );
+  const oraclePath = path.join(
+    process.env.HOME || "~",
+    ".config/solana/oracle.json"
+  );
 
   const admin = anchor.web3.Keypair.fromSecretKey(
     Buffer.from(JSON.parse(fs.readFileSync(adminPath, "utf-8")))
@@ -101,12 +110,19 @@ async function main() {
     Buffer.from(JSON.parse(fs.readFileSync(oraclePath, "utf-8")))
   );
 
-  const connection = new anchor.web3.Connection("https://api.devnet.solana.com", "confirmed");
+  const connection = new anchor.web3.Connection(
+    "https://api.devnet.solana.com",
+    "confirmed"
+  );
   const wallet = new anchor.Wallet(admin);
-  const provider = new anchor.AnchorProvider(connection, wallet, { commitment: "confirmed" });
+  const provider = new anchor.AnchorProvider(connection, wallet, {
+    commitment: "confirmed",
+  });
   anchor.setProvider(provider);
 
-  const idl = JSON.parse(fs.readFileSync(path.join(__dirname, "../target/idl/myrmex.json"), "utf-8"));
+  const idl = JSON.parse(
+    fs.readFileSync(path.join(__dirname, "../target/idl/myrmex.json"), "utf-8")
+  );
   const program = new anchor.Program(idl, provider);
 
   const bal = await connection.getBalance(admin.publicKey);
@@ -118,16 +134,28 @@ async function main() {
   console.log("USDC mint:      ", USDC_MINT.toBase58());
 
   if (bal < 0.3e9) {
-    console.error("❌ Need at least 0.3 SOL. Run: solana airdrop 2 --url devnet");
+    console.error(
+      "❌ Need at least 0.3 SOL. Run: solana airdrop 2 --url devnet"
+    );
     process.exit(1);
   }
 
   // Ensure admin USDC ATA exists and mint seed capital
   const adminUsdc = await createAssociatedTokenAccountIdempotent(
-    connection, admin, USDC_MINT, admin.publicKey
+    connection,
+    admin,
+    USDC_MINT,
+    admin.publicKey
   );
   const totalSeed = V2_POOLS.reduce((s, p) => s + p.seedUsdc, 0);
-  await mintTo(connection, admin, USDC_MINT, adminUsdc, admin, BigInt(totalSeed * 1_000_000));
+  await mintTo(
+    connection,
+    admin,
+    USDC_MINT,
+    adminUsdc,
+    admin,
+    BigInt(totalSeed * 1_000_000)
+  );
   console.log(`\nMinted ${totalSeed} USDC seed capital to admin`);
 
   const results: any[] = [];
@@ -137,7 +165,11 @@ async function main() {
     console.log(`   ${pool.desc}`);
 
     const [poolPda] = anchor.web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("pool"), admin.publicKey.toBuffer(), Buffer.from([pool.type])],
+      [
+        Buffer.from("pool"),
+        admin.publicKey.toBuffer(),
+        Buffer.from([pool.type]),
+      ],
       PROGRAM_ID
     );
     const [lpMint] = anchor.web3.PublicKey.findProgramAddressSync(
@@ -154,21 +186,42 @@ async function main() {
     try {
       await (program as any).methods
         .initializePool(pool.type, nameToBytes(pool.name))
-        .accounts({ authority: admin.publicKey, pool: poolPda, usdcMint: USDC_MINT, vault: poolVault, lpTokenMint: lpMint })
+        .accounts({
+          authority: admin.publicKey,
+          pool: poolPda,
+          usdcMint: USDC_MINT,
+          vault: poolVault,
+          lpTokenMint: lpMint,
+        })
         .rpc();
       console.log("   ✓ Pool initialized:", poolPda.toBase58());
     } catch (e: any) {
-      if (e.message?.includes("already in use") || e.message?.includes("custom program error: 0x0")) {
+      if (
+        e.message?.includes("already in use") ||
+        e.message?.includes("custom program error: 0x0")
+      ) {
         console.log("   ℹ Pool already exists:", poolPda.toBase58());
       } else throw e;
     }
 
     // 2. Fund pool
-    const adminLpAta = await createAssociatedTokenAccountIdempotent(connection, admin, lpMint, admin.publicKey);
+    const adminLpAta = await createAssociatedTokenAccountIdempotent(
+      connection,
+      admin,
+      lpMint,
+      admin.publicKey
+    );
     try {
       await (program as any).methods
         .fundPool(new anchor.BN(pool.seedUsdc * 1_000_000))
-        .accounts({ provider: admin.publicKey, pool: poolPda, providerUsdc: adminUsdc, poolVault, lpTokenMint: lpMint, providerLpTokens: adminLpAta })
+        .accounts({
+          provider: admin.publicKey,
+          pool: poolPda,
+          providerUsdc: adminUsdc,
+          poolVault,
+          lpTokenMint: lpMint,
+          providerLpTokens: adminLpAta,
+        })
         .rpc();
       console.log(`   ✓ Seeded $${pool.seedUsdc.toLocaleString()} USDC`);
     } catch (e: any) {
@@ -183,17 +236,37 @@ async function main() {
           new anchor.BN(pool.minPremiumBps),
           new anchor.BN(pool.maxCoverageBps)
         )
-        .accounts({ authority: admin.publicKey, pool: poolPda, poolConfig: poolConfigPda, systemProgram: anchor.web3.SystemProgram.programId })
+        .accounts({
+          authority: admin.publicKey,
+          pool: poolPda,
+          poolConfig: poolConfigPda,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
         .rpc();
       console.log("   ✓ PoolConfig:  ", poolConfigPda.toBase58());
-      console.log(`   ✓ Min premium: ${pool.minPremiumBps / 100}%  Max coverage: ${pool.maxCoverageBps / 100}%`);
+      console.log(
+        `   ✓ Min premium: ${pool.minPremiumBps / 100}%  Max coverage: ${
+          pool.maxCoverageBps / 100
+        }%`
+      );
     } catch (e: any) {
-      if (e.message?.includes("already in use") || e.message?.includes("already initialized")) {
-        console.log("   ℹ PoolConfig already exists:", poolConfigPda.toBase58());
+      if (
+        e.message?.includes("already in use") ||
+        e.message?.includes("already initialized")
+      ) {
+        console.log(
+          "   ℹ PoolConfig already exists:",
+          poolConfigPda.toBase58()
+        );
       } else throw e;
     }
 
-    results.push({ name: pool.name, type: pool.type, pool: poolPda.toBase58(), poolConfig: poolConfigPda.toBase58() });
+    results.push({
+      name: pool.name,
+      type: pool.type,
+      pool: poolPda.toBase58(),
+      poolConfig: poolConfigPda.toBase58(),
+    });
   }
 
   console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");

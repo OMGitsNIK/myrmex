@@ -44,7 +44,10 @@ function parseScopeHash(hex?: string): Buffer | null {
  * Parses description encoded as "sha256:<64-hex>|<human text>"
  * Returns { sourceHash, humanText } or just humanText if no hash prefix.
  */
-function parseDescription(raw: string): { sourceHash: string | null; humanText: string } {
+function parseDescription(raw: string): {
+  sourceHash: string | null;
+  humanText: string;
+} {
   const trimmed = raw.replace(/\0/g, "").trim();
   if (trimmed.startsWith("sha256:") && trimmed[71] === "|") {
     return {
@@ -61,7 +64,9 @@ async function fetchReport(poolPk: PublicKey, scopeHash: Buffer) {
     [Buffer.from("oracle_report"), poolPk.toBuffer(), scopeHash],
     PROGRAM_ID
   );
-  const report = await (program as any).account.oracleReport.fetch(oracleReportPda);
+  const report = await (program as any).account.oracleReport.fetch(
+    oracleReportPda
+  );
   return { report, pda: oracleReportPda };
 }
 
@@ -73,7 +78,9 @@ router.get("/:pool", async (req, res) => {
     let scopeHash = parseScopeHash(req.query.scope_hash as string | undefined);
 
     if (!scopeHash) {
-      const pool = (await (program as any).account.riskPool.fetch(poolPk)) as any;
+      const pool = (await (program as any).account.riskPool.fetch(
+        poolPk
+      )) as any;
       scopeHash = scopeHashFromSeed(
         DEFAULT_SCOPE_SEEDS[pool.poolType] || `pool:${pool.poolType}:default`
       );

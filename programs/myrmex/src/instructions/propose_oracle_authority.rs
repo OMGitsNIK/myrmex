@@ -1,6 +1,6 @@
-use anchor_lang::prelude::*;
 use crate::errors::MyrmexError;
-use crate::state::{OracleAuthorityProposal, ORACLE_TIMELOCK_SECS, PoolConfig, RiskPool};
+use crate::state::{OracleAuthorityProposal, PoolConfig, RiskPool, ORACLE_TIMELOCK_SECS};
+use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 pub struct ProposeOracleAuthority<'info> {

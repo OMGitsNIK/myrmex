@@ -34,7 +34,10 @@ router.get("/", async (_req, res) => {
   try {
     const { program } = getAnchorProgram();
     const allPools = await (program as any).account.riskPool.all();
-    // Filter to canonical addresses to prevent spoof pools from appearing
+
+    // Strict Filtering:
+    // 1. Must be in the canonical list
+    // 2. Must have a valid pool_config (enforced below)
     const pools = allPools.filter(({ publicKey }: { publicKey: PublicKey }) =>
       CANONICAL_POOLS.has(publicKey.toBase58())
     );
@@ -53,7 +56,7 @@ router.get("/", async (_req, res) => {
             ? ((premiumAccrued / available) * 365 * 100).toFixed(2)
             : "0.00";
 
-        // Fetch pool_config if it exists
+        // Fetch pool_config
         const [poolConfigPda] = PublicKey.findProgramAddressSync(
           [Buffer.from("pool_config"), publicKey.toBuffer()],
           PROGRAM_ID
@@ -66,18 +69,24 @@ router.get("/", async (_req, res) => {
           poolConfig = {
             pubkey: poolConfigPda.toBase58(),
             oracleAuthority: cfg.oracleAuthority.toBase58(),
+            pricingAuthority: cfg.pricingAuthority.toBase58(),
             minPremiumBps: cfg.minPremiumBps.toNumber(),
             maxCoverageBps: cfg.maxCoverageBps.toNumber(),
           };
         } catch {
-          // pool_config not yet initialized
+          // pool_config not yet initialized — in strict mode, we might want to skip this pool
+          return null;
         }
 
         return {
           pubkey: publicKey.toBase58(),
           poolType: acc.poolType,
-          poolName: V2_POOL_NAMES[acc.poolType] ??
-            Buffer.from(acc.poolName).toString("utf8").replace(/\0/g, "").trim(),
+          poolName:
+            V2_POOL_NAMES[acc.poolType] ??
+            Buffer.from(acc.poolName)
+              .toString("utf8")
+              .replace(/\0/g, "")
+              .trim(),
           totalLiquidity,
           totalLocked,
           available,
@@ -93,7 +102,8 @@ router.get("/", async (_req, res) => {
       })
     );
 
-    res.json(result);
+    // Filter out nulls from missing configs
+    res.json(result.filter((p) => p !== null));
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }

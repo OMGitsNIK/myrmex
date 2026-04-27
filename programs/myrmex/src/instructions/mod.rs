@@ -2,8 +2,8 @@
 
 pub mod apply_oracle_authority;
 pub mod cast_vote;
-pub mod create_proposal;
 pub mod create_policy;
+pub mod create_proposal;
 pub mod expire_policy;
 pub mod fund_pool;
 pub mod initialize_pool;
@@ -18,8 +18,8 @@ pub mod withdraw_lp;
 
 pub use apply_oracle_authority::*;
 pub use cast_vote::*;
-pub use create_proposal::*;
 pub use create_policy::*;
+pub use create_proposal::*;
 pub use expire_policy::*;
 pub use fund_pool::*;
 pub use initialize_pool::*;

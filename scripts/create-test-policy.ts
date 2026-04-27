@@ -50,10 +50,7 @@ async function main() {
   anchor.setProvider(provider);
 
   const idl = JSON.parse(
-    fs.readFileSync(
-      path.join(__dirname, "../target/idl/myrmex.json"),
-      "utf-8"
-    )
+    fs.readFileSync(path.join(__dirname, "../target/idl/myrmex.json"), "utf-8")
   );
   const program = new anchor.Program(idl, provider);
 
@@ -76,20 +73,29 @@ async function main() {
     admin.publicKey
   );
   // Mint 100 USDC for premium payment
-  await mintTo(connection, admin, usdcMint, adminUsdc, admin, BigInt(100_000_000));
+  await mintTo(
+    connection,
+    admin,
+    usdcMint,
+    adminUsdc,
+    admin,
+    BigInt(100_000_000)
+  );
   console.log("Minted 100 USDC to admin");
 
   // Policy params
   const nonce = new anchor.BN(Date.now());
-  const payoutAmount = new anchor.BN(50_000_000);  // 50 USDC
-  const premiumAmount = new anchor.BN(3_000_000);  // 3 USDC (6% of payout — above 5% floor)
+  const payoutAmount = new anchor.BN(50_000_000); // 50 USDC
+  const premiumAmount = new anchor.BN(3_000_000); // 3 USDC (6% of payout — above 5% floor)
 
   // Trigger: rainfall < 200 (= 2mm * 100 scale)
   const triggerCondition = {
     oraclePubkey: oracleKp.publicKey,
-    scopeHash: Array.from(createHash("sha256").update("flood:Mississippi").digest()),
-    threshold: new anchor.BN(200),  // 200 = 2.00mm scaled
-    comparison: 1,                   // LessThan
+    scopeHash: Array.from(
+      createHash("sha256").update("flood:Mississippi").digest()
+    ),
+    threshold: new anchor.BN(200), // 200 = 2.00mm scaled
+    comparison: 1, // LessThan
   };
 
   const expiresAt = new anchor.BN(Math.floor(Date.now() / 1000) + 30 * 86400);
@@ -113,7 +119,14 @@ async function main() {
   console.log("Policy PDA:", policyPda.toBase58());
 
   const tx = await (program as any).methods
-    .createPolicy(1, payoutAmount, premiumAmount, triggerCondition, expiresAt, nonce)
+    .createPolicy(
+      1,
+      payoutAmount,
+      premiumAmount,
+      triggerCondition,
+      expiresAt,
+      nonce
+    )
     .accounts({
       policyholder: admin.publicKey,
       policy: policyPda,
@@ -132,7 +145,9 @@ async function main() {
   console.log("\nTest simulate trigger with:");
   console.log(`  curl -X POST http://localhost:3001/api/simulate-trigger \\`);
   console.log(`    -H 'Content-Type: application/json' \\`);
-  console.log(`    -d '{"policy":"${policyPda.toBase58()}","oracle_value":100}'`);
+  console.log(
+    `    -d '{"policy":"${policyPda.toBase58()}","oracle_value":100}'`
+  );
 }
 
 main().catch((e) => {

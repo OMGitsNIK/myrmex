@@ -8,7 +8,6 @@ pub mod oracle;
 pub mod state;
 
 use instructions::*;
-use state::TriggerCondition;
 
 declare_id!("9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan");
 
@@ -27,10 +26,17 @@ pub mod myrmex {
     pub fn initialize_pool_config(
         ctx: Context<InitializePoolConfig>,
         oracle_authority: Pubkey,
+        pricing_authority: Pubkey,
         min_premium_bps: u64,
         max_coverage_bps: u64,
     ) -> Result<()> {
-        instructions::initialize_pool_config::handler(ctx, oracle_authority, min_premium_bps, max_coverage_bps)
+        instructions::initialize_pool_config::handler(
+            ctx,
+            oracle_authority,
+            pricing_authority,
+            min_premium_bps,
+            max_coverage_bps,
+        )
     }
 
     pub fn post_oracle_report(
@@ -50,24 +56,8 @@ pub mod myrmex {
         instructions::withdraw_lp::handler(ctx, lp_amount)
     }
 
-    pub fn create_policy(
-        ctx: Context<CreatePolicy>,
-        coverage_type: u8,
-        payout_amount: u64,
-        premium_amount: u64,
-        trigger_condition: TriggerCondition,
-        expires_at: i64,
-        nonce: i64,
-    ) -> Result<()> {
-        instructions::create_policy::handler(
-            ctx,
-            coverage_type,
-            payout_amount,
-            premium_amount,
-            trigger_condition,
-            expires_at,
-            nonce,
-        )
+    pub fn create_policy(ctx: Context<CreatePolicy>, params: CreatePolicyParams) -> Result<()> {
+        instructions::create_policy::handler(ctx, params)
     }
 
     pub fn trigger_payout(ctx: Context<TriggerPayout>) -> Result<()> {
@@ -82,8 +72,14 @@ pub mod myrmex {
         ctx: Context<UpdatePoolConfig>,
         min_premium_bps: u64,
         max_coverage_bps: u64,
+        pricing_authority: Pubkey,
     ) -> Result<()> {
-        instructions::update_pool_config::handler(ctx, min_premium_bps, max_coverage_bps)
+        instructions::update_pool_config::handler(
+            ctx,
+            min_premium_bps,
+            max_coverage_bps,
+            pricing_authority,
+        )
     }
 
     pub fn propose_oracle_authority(
@@ -112,7 +108,13 @@ pub mod myrmex {
         description: [u8; 128],
         voting_duration_secs: i64,
     ) -> Result<()> {
-        instructions::create_proposal::handler(ctx, proposal_id, title, description, voting_duration_secs)
+        instructions::create_proposal::handler(
+            ctx,
+            proposal_id,
+            title,
+            description,
+            voting_duration_secs,
+        )
     }
 
     pub fn cast_vote(ctx: Context<CastVote>, proposal_id: u64, vote: bool) -> Result<()> {
