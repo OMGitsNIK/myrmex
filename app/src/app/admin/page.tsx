@@ -53,7 +53,9 @@ function CopyButton({ value }: { value: string }) {
       onClick={handleCopy}
       title="Copy public key"
       className={`transition-colors ${
-        copied ? "text-[var(--accent)]" : "text-gray-500 hover:text-[var(--accent)]"
+        copied
+          ? "text-[var(--accent)]"
+          : "text-gray-500 hover:text-[var(--accent)]"
       }`}
     >
       {copied ? (
@@ -144,20 +146,26 @@ export default function AdminPage() {
   const totalTvl = lamportsToUsdc(stats?.total_tvl_usdc ?? 0);
   const avgPoolUtilization =
     pools.length > 0
-      ? pools.reduce((sum, p) => sum + parseFloat(p.utilizationPct), 0) / pools.length
+      ? pools.reduce((sum, p) => sum + parseFloat(p.utilizationPct), 0) /
+        pools.length
       : 0;
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Protocol Admin</h1>
+          <h1 className="text-3xl font-bold text-white tracking-tight">
+            Protocol Admin
+          </h1>
           <p className="text-gray-400 mt-2">
-            Protocol metrics sourced from the API indexer. Values reflect on-chain state at last poll — not a real-time ledger.
+            Protocol metrics sourced from the API indexer. Values reflect
+            on-chain state at last poll — not a real-time ledger.
           </p>
         </div>
         <div className="text-xs text-gray-500">
-          {lastUpdated ? `Auto-refreshing every 15s • Updated ${lastUpdated.toLocaleTimeString()}` : "Loading live metrics..."}
+          {lastUpdated
+            ? `Auto-refreshing every 15s • Updated ${lastUpdated.toLocaleTimeString()}`
+            : "Loading live metrics..."}
         </div>
       </div>
 
@@ -208,15 +216,24 @@ export default function AdminPage() {
               <thead className="bg-[var(--surface-2)]/40 text-xs uppercase tracking-widest text-gray-500">
                 <tr>
                   <th className="px-6 py-3 text-left font-medium">Pool Type</th>
-                  <th className="px-6 py-3 text-left font-medium">TVL (USDC)</th>
-                  <th className="px-6 py-3 text-left font-medium">Active Policies</th>
-                  <th className="px-6 py-3 text-left font-medium">Pool Address</th>
+                  <th className="px-6 py-3 text-left font-medium">
+                    TVL (USDC)
+                  </th>
+                  <th className="px-6 py-3 text-left font-medium">
+                    Active Policies
+                  </th>
+                  <th className="px-6 py-3 text-left font-medium">
+                    Pool Address
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {loading && pools.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-6 py-8 text-center text-gray-400">
+                    <td
+                      colSpan={4}
+                      className="px-6 py-8 text-center text-gray-400"
+                    >
                       Loading pools...
                     </td>
                   </tr>
@@ -224,26 +241,36 @@ export default function AdminPage() {
 
                 {!loading && pools.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-6 py-8 text-center text-gray-400">
+                    <td
+                      colSpan={4}
+                      className="px-6 py-8 text-center text-gray-400"
+                    >
                       No pools returned by the API.
                     </td>
                   </tr>
                 )}
 
                 {pools.map((pool) => (
-                  <tr key={pool.pubkey} className="border-t border-[var(--border)]">
+                  <tr
+                    key={pool.pubkey}
+                    className="border-t border-[var(--border)]"
+                  >
                     <td className="px-6 py-4">
                       <div className="font-medium text-white">
-                        {COVERAGE_NAMES[pool.poolType] ?? `Pool Type ${pool.poolType}`}
+                        {COVERAGE_NAMES[pool.poolType] ??
+                          `Pool Type ${pool.poolType}`}
                       </div>
                       <div className="mt-1 text-xs text-gray-500">
-                        Utilization {pool.utilizationPct}% • {pool.isActive ? "Active" : "Inactive"}
+                        Utilization {pool.utilizationPct}% •{" "}
+                        {pool.isActive ? "Active" : "Inactive"}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-white font-medium">
                       ${formatUsdc(lamportsToUsdc(pool.totalLiquidity))}
                     </td>
-                    <td className="px-6 py-4 text-white">{pool.activePolicies}</td>
+                    <td className="px-6 py-4 text-white">
+                      {pool.activePolicies}
+                    </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-gray-500 font-mono">
@@ -286,12 +313,15 @@ export default function AdminPage() {
             <p>
               Metrics sourced from{" "}
               <code className="text-[var(--accent)]">/api/stats</code> and{" "}
-              <code className="text-[var(--accent)]">/api/pools</code>. Values reflect on-chain state at last poll.
+              <code className="text-[var(--accent)]">/api/pools</code>. Values
+              reflect on-chain state at last poll.
             </p>
             <p>
-              <span className="text-yellow-400 font-medium">Pricing note:</span> The actuarial quote is advisory. The on-chain
-              floor (<code className="text-[var(--accent)]">min_premium_bps</code> in{" "}
-              <code className="text-[var(--accent)]">pool_config</code>) is the only enforced minimum.
+              <span className="text-yellow-400 font-medium">Pricing note:</span>{" "}
+              The actuarial quote is advisory. The on-chain floor (
+              <code className="text-[var(--accent)]">min_premium_bps</code> in{" "}
+              <code className="text-[var(--accent)]">pool_config</code>) is the
+              only enforced minimum.
             </p>
           </div>
         </div>
@@ -309,7 +339,9 @@ export default function AdminPage() {
 
 function UpdatePoolConfigPanel({ pools }: { pools: PoolResponse[] }) {
   const { program, wallet } = useAnchorProgram();
-  const PROGRAM_ID = new PublicKey("9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan");
+  const PROGRAM_ID = new PublicKey(
+    "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan"
+  );
 
   const [selectedPool, setSelectedPool] = useState("");
   const [minPremiumBps, setMinPremiumBps] = useState("500");
@@ -318,15 +350,31 @@ function UpdatePoolConfigPanel({ pools }: { pools: PoolResponse[] }) {
   const [submitting, setSubmitting] = useState(false);
 
   const handleUpdate = async () => {
-    if (!program || !wallet) { toast.error("Connect pool authority wallet"); return; }
-    if (!selectedPool) { toast.error("Select a pool"); return; }
+    if (!program || !wallet) {
+      toast.error("Connect pool authority wallet");
+      return;
+    }
+    if (!selectedPool) {
+      toast.error("Select a pool");
+      return;
+    }
     const minBps = parseInt(minPremiumBps);
     const maxBps = parseInt(maxCoverageBps);
     let pricingPk: PublicKey;
-    try { pricingPk = new PublicKey(pricingAuth); } catch { toast.error("Invalid pricing authority pubkey"); return; }
-
-    if (!isFinite(minBps) || minBps < 0 || minBps > 10000) { toast.error("min_premium_bps must be 0–10000"); return; }
-    if (!isFinite(maxBps) || maxBps < 1 || maxBps > 10000) { toast.error("max_coverage_bps must be 1–10000"); return; }
+    try {
+      pricingPk = new PublicKey(pricingAuth);
+    } catch {
+      toast.error("Invalid pricing authority pubkey");
+      return;
+    }
+    if (!isFinite(minBps) || minBps < 0 || minBps > 10000) {
+      toast.error("min_premium_bps must be 0–10000");
+      return;
+    }
+    if (!isFinite(maxBps) || maxBps < 1 || maxBps > 10000) {
+      toast.error("max_coverage_bps must be 1–10000");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -338,7 +386,11 @@ function UpdatePoolConfigPanel({ pools }: { pools: PoolResponse[] }) {
       const { BN } = await import("@coral-xyz/anchor");
       await (program as any).methods
         .updatePoolConfig(new BN(minBps), new BN(maxBps), pricingPk)
-        .accounts({ authority: wallet.publicKey, pool: poolPk, poolConfig: poolConfigPda })
+        .accounts({
+          authority: wallet.publicKey,
+          pool: poolPk,
+          poolConfig: poolConfigPda,
+        })
         .rpc();
       toast.success("pool_config updated on-chain");
     } catch (e: unknown) {
@@ -367,7 +419,8 @@ function UpdatePoolConfigPanel({ pools }: { pools: PoolResponse[] }) {
             <option value="">— select pool —</option>
             {pools.map((p) => (
               <option key={p.pubkey} value={p.pubkey}>
-                {COVERAGE_NAMES[p.poolType] ?? `Type ${p.poolType}`} — {p.pubkey.slice(0, 8)}…
+                {COVERAGE_NAMES[p.poolType] ?? `Type ${p.poolType}`} —{" "}
+                {p.pubkey.slice(0, 8)}…
               </option>
             ))}
           </select>
@@ -388,21 +441,31 @@ function UpdatePoolConfigPanel({ pools }: { pools: PoolResponse[] }) {
             type="number"
             value={minPremiumBps}
             onChange={(e) => setMinPremiumBps(e.target.value)}
-            min={0} max={10000} step={1}
+            min={0}
+            max={10000}
+            step={1}
             className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white text-sm focus:border-[var(--accent)]/50 outline-none"
           />
-          <span className="text-xs text-gray-600">{(parseInt(minPremiumBps) / 100 || 0).toFixed(2)}% of payout</span>
+          <span className="text-xs text-gray-600">
+            {(parseInt(minPremiumBps) / 100 || 0).toFixed(2)}% of payout
+          </span>
         </label>
         <label className="space-y-1">
-          <span className="text-xs text-gray-500">Max Coverage bps (1–10000)</span>
+          <span className="text-xs text-gray-500">
+            Max Coverage bps (1–10000)
+          </span>
           <input
             type="number"
             value={maxCoverageBps}
             onChange={(e) => setMaxCoverageBps(e.target.value)}
-            min={1} max={10000} step={1}
+            min={1}
+            max={10000}
+            step={1}
             className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white text-sm focus:border-[var(--accent)]/50 outline-none"
           />
-          <span className="text-xs text-gray-600">{(parseInt(maxCoverageBps) / 100 || 0).toFixed(2)}% of pool TVL</span>
+          <span className="text-xs text-gray-600">
+            {(parseInt(maxCoverageBps) / 100 || 0).toFixed(2)}% of pool TVL
+          </span>
         </label>
       </div>
       <button
@@ -412,24 +475,41 @@ function UpdatePoolConfigPanel({ pools }: { pools: PoolResponse[] }) {
       >
         {submitting ? "Updating…" : "Update Pool Config"}
       </button>
-      {!wallet && <p className="text-xs text-gray-600">Connect the pool authority wallet to update config.</p>}
+      {!wallet && (
+        <p className="text-xs text-gray-600">
+          Connect the pool authority wallet to update config.
+        </p>
+      )}
     </div>
   );
 }
 
 function ProposeOracleAuthorityPanel({ pools }: { pools: PoolResponse[] }) {
   const { program, wallet } = useAnchorProgram();
-  const PROGRAM_ID = new PublicKey("9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan");
+  const PROGRAM_ID = new PublicKey(
+    "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan"
+  );
 
   const [selectedPool, setSelectedPool] = useState("");
   const [newOracle, setNewOracle] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const handlePropose = async () => {
-    if (!program || !wallet) { toast.error("Connect pool authority wallet"); return; }
-    if (!selectedPool) { toast.error("Select a pool"); return; }
+    if (!program || !wallet) {
+      toast.error("Connect pool authority wallet");
+      return;
+    }
+    if (!selectedPool) {
+      toast.error("Select a pool");
+      return;
+    }
     let oraclePk: PublicKey;
-    try { oraclePk = new PublicKey(newOracle); } catch { toast.error("Invalid oracle pubkey"); return; }
+    try {
+      oraclePk = new PublicKey(newOracle);
+    } catch {
+      toast.error("Invalid oracle pubkey");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -452,7 +532,9 @@ function ProposeOracleAuthorityPanel({ pools }: { pools: PoolResponse[] }) {
           systemProgram: "11111111111111111111111111111111",
         })
         .rpc();
-      toast.success("Oracle authority change proposed — takes effect in 1 hour");
+      toast.success(
+        "Oracle authority change proposed — takes effect in 1 hour"
+      );
     } catch (e: unknown) {
       toast.error("Proposal failed", { description: (e as Error).message });
     } finally {
@@ -463,9 +545,12 @@ function ProposeOracleAuthorityPanel({ pools }: { pools: PoolResponse[] }) {
   return (
     <div className="card p-6 space-y-5">
       <div>
-        <h2 className="font-semibold text-white">Propose Oracle Authority Change</h2>
+        <h2 className="font-semibold text-white">
+          Propose Oracle Authority Change
+        </h2>
         <p className="text-xs text-gray-500 mt-1">
-          Initiates a 1-hour timelock before the new oracle authority takes effect. Anyone can cancel by monitoring the proposal PDA.
+          Initiates a 1-hour timelock before the new oracle authority takes
+          effect. Anyone can cancel by monitoring the proposal PDA.
         </p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -479,13 +564,16 @@ function ProposeOracleAuthorityPanel({ pools }: { pools: PoolResponse[] }) {
             <option value="">— select pool —</option>
             {pools.map((p) => (
               <option key={p.pubkey} value={p.pubkey}>
-                {COVERAGE_NAMES[p.poolType] ?? `Type ${p.poolType}`} — {p.pubkey.slice(0, 8)}…
+                {COVERAGE_NAMES[p.poolType] ?? `Type ${p.poolType}`} —{" "}
+                {p.pubkey.slice(0, 8)}…
               </option>
             ))}
           </select>
         </label>
         <label className="space-y-1">
-          <span className="text-xs text-gray-500">New Oracle Authority (pubkey)</span>
+          <span className="text-xs text-gray-500">
+            New Oracle Authority (pubkey)
+          </span>
           <input
             type="text"
             value={newOracle}
@@ -502,21 +590,33 @@ function ProposeOracleAuthorityPanel({ pools }: { pools: PoolResponse[] }) {
       >
         {submitting ? "Proposing…" : "Propose Oracle Change (1-hr timelock)"}
       </button>
-      {!wallet && <p className="text-xs text-gray-600">Connect the pool authority wallet to propose.</p>}
+      {!wallet && (
+        <p className="text-xs text-gray-600">
+          Connect the pool authority wallet to propose.
+        </p>
+      )}
     </div>
   );
 }
 
 function ApplyOracleAuthorityPanel({ pools }: { pools: PoolResponse[] }) {
   const { program, wallet } = useAnchorProgram();
-  const PROGRAM_ID = new PublicKey("9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan");
+  const PROGRAM_ID = new PublicKey(
+    "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan"
+  );
 
   const [selectedPool, setSelectedPool] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const handleApply = async () => {
-    if (!program || !wallet) { toast.error("Connect pool authority wallet"); return; }
-    if (!selectedPool) { toast.error("Select a pool"); return; }
+    if (!program || !wallet) {
+      toast.error("Connect pool authority wallet");
+      return;
+    }
+    if (!selectedPool) {
+      toast.error("Select a pool");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -549,9 +649,12 @@ function ApplyOracleAuthorityPanel({ pools }: { pools: PoolResponse[] }) {
   return (
     <div className="card p-6 space-y-5">
       <div>
-        <h2 className="font-semibold text-white">Apply Oracle Authority Change</h2>
+        <h2 className="font-semibold text-white">
+          Apply Oracle Authority Change
+        </h2>
         <p className="text-xs text-gray-500 mt-1">
-          Applies a previously proposed oracle authority after the 1-hour timelock has expired.
+          Applies a previously proposed oracle authority after the 1-hour
+          timelock has expired.
         </p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -565,7 +668,8 @@ function ApplyOracleAuthorityPanel({ pools }: { pools: PoolResponse[] }) {
             <option value="">— select pool —</option>
             {pools.map((p) => (
               <option key={p.pubkey} value={p.pubkey}>
-                {COVERAGE_NAMES[p.poolType] ?? `Type ${p.poolType}`} — {p.pubkey.slice(0, 8)}…
+                {COVERAGE_NAMES[p.poolType] ?? `Type ${p.poolType}`} —{" "}
+                {p.pubkey.slice(0, 8)}…
               </option>
             ))}
           </select>
@@ -578,7 +682,11 @@ function ApplyOracleAuthorityPanel({ pools }: { pools: PoolResponse[] }) {
       >
         {submitting ? "Applying…" : "Apply Oracle Change (after timelock)"}
       </button>
-      {!wallet && <p className="text-xs text-gray-600">Connect the pool authority wallet to apply.</p>}
+      {!wallet && (
+        <p className="text-xs text-gray-600">
+          Connect the pool authority wallet to apply.
+        </p>
+      )}
     </div>
   );
 }
@@ -596,7 +704,9 @@ function StatCard({
 }) {
   return (
     <div className="card p-6">
-      <div className="text-xs uppercase tracking-widest text-gray-500">{label}</div>
+      <div className="text-xs uppercase tracking-widest text-gray-500">
+        {label}
+      </div>
       <div className="mt-3 text-3xl font-bold text-white tracking-tight">
         {loading ? "..." : value}
       </div>
@@ -616,8 +726,12 @@ function MiniMetric({
 }) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/30 p-4">
-      <div className="text-xs uppercase tracking-widest text-gray-500">{label}</div>
-      <div className="mt-2 text-2xl font-semibold text-white">{loading ? "..." : value}</div>
+      <div className="text-xs uppercase tracking-widest text-gray-500">
+        {label}
+      </div>
+      <div className="mt-2 text-2xl font-semibold text-white">
+        {loading ? "..." : value}
+      </div>
     </div>
   );
 }

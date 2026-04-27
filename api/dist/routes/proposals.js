@@ -18,9 +18,12 @@ router.get("/", async (_req, res) => {
             .map((a) => {
             const d = a.account;
             const endsAt = d.votingEndsAt.toNumber();
-            const status = d.executed ? "executed"
+            const status = d.executed
+                ? "executed"
                 : endsAt < now
-                    ? d.votesFor.toNumber() > d.votesAgainst.toNumber() ? "passed" : "rejected"
+                    ? d.votesFor.toNumber() > d.votesAgainst.toNumber()
+                        ? "passed"
+                        : "rejected"
                     : "active";
             return {
                 pubkey: a.publicKey.toBase58(),

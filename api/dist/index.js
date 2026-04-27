@@ -65,6 +65,16 @@ app.use("/api/stats", stats_1.statsRouter);
 app.use("/api/oracle-report", oracle_1.oracleRouter);
 app.use("/api/proposals", proposals_1.proposalsRouter);
 app.get("/health", (_, res) => res.json({ status: "ok", service: "myrmex-api", version: "2.0-oracle" }));
+// 404 for unmatched routes
+app.use((_req, res) => {
+    res.status(404).json({ error: "Not found" });
+});
+// Global error handler — catches any unhandled throw from async route handlers.
+// Without this, Express 4 returns an empty 500 or leaks a stack trace.
+app.use((err, _req, res, _next) => {
+    console.error("[api] unhandled error:", err.message, err.stack);
+    res.status(500).json({ error: "Internal server error" });
+});
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
     console.log(`MYRMEX API running on port ${PORT}`);

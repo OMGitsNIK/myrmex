@@ -1,5 +1,5 @@
 use crate::errors::MyrmexError;
-use crate::state::GovernanceProposal;
+use crate::state::{GovernanceProposal, StakeAccount};
 use anchor_lang::prelude::*;
 
 /// Minimum voting duration: 1 day. Maximum: 30 days.
@@ -11,6 +11,15 @@ const MAX_VOTING_SECS: i64 = 86_400 * 30;
 pub struct CreateProposal<'info> {
     #[account(mut)]
     pub proposer: Signer<'info>,
+
+    /// Proposer must have MYR staked — prevents spam from wallets with no skin in the game.
+    #[account(
+        seeds = [b"stake", proposer.key().as_ref()],
+        bump = proposer_stake.bump,
+        constraint = proposer_stake.owner == proposer.key() @ MyrmexError::Unauthorized,
+        constraint = proposer_stake.amount_staked > 0 @ MyrmexError::Unauthorized,
+    )]
+    pub proposer_stake: Account<'info, StakeAccount>,
 
     #[account(
         init,

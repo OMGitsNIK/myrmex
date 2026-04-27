@@ -29,14 +29,38 @@ function CopyButton({ value }: { value: string }) {
         setTimeout(() => setCopied(false), 1500);
       }}
       title="Copy public key"
-      className={`transition-colors ${copied ? "text-[var(--accent)]" : "text-gray-500 hover:text-[var(--accent)]"}`}
+      className={`transition-colors ${
+        copied
+          ? "text-[var(--accent)]"
+          : "text-gray-500 hover:text-[var(--accent)]"
+      }`}
     >
       {copied ? (
-        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <polyline points="20 6 9 17 4 12" />
         </svg>
       ) : (
-        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
         </svg>
@@ -62,7 +86,10 @@ function PolicyCard({ p }: { p: PolicyData }) {
       ? { label: "Claimed", color: "bg-blue-500/20 text-blue-400" }
       : statusType === "expired"
       ? { label: "Expired", color: "bg-gray-700 text-gray-400" }
-      : { label: "● Active", color: "bg-[var(--accent-dim)] text-[var(--accent)]" };
+      : {
+          label: "● Active",
+          color: "bg-[var(--accent-dim)] text-[var(--accent)]",
+        };
 
   const tc = acc.triggerCondition;
 
@@ -77,7 +104,9 @@ function PolicyCard({ p }: { p: PolicyData }) {
             <CopyButton value={pubkey} />
           </div>
         </div>
-        <span className={`px-2 py-1 rounded text-xs font-medium ${status.color}`}>
+        <span
+          className={`px-2 py-1 rounded text-xs font-medium ${status.color}`}
+        >
           {status.label}
         </span>
       </div>
@@ -85,24 +114,34 @@ function PolicyCard({ p }: { p: PolicyData }) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
         <div>
           <div className="text-gray-500 text-xs mb-1">Payout</div>
-          <div className="text-[var(--accent)] font-bold">${payout.toLocaleString()} USDC</div>
+          <div className="text-[var(--accent)] font-bold">
+            ${payout.toLocaleString()} USDC
+          </div>
         </div>
         <div>
           <div className="text-gray-500 text-xs mb-1">Premium Paid</div>
-          <div className="text-white font-medium">${premium.toFixed(2)} USDC</div>
+          <div className="text-white font-medium">
+            ${premium.toFixed(2)} USDC
+          </div>
         </div>
         <div>
           <div className="text-gray-500 text-xs mb-1">Trigger</div>
           <div className="text-white font-mono text-xs">
             {(() => {
               const ct = COVERAGE_TYPES.find((t) => t.id === acc.coverageType);
-              return ct ? ct.thresholdDisplay(tc.threshold) : `value ${tc.threshold}`;
+              return ct
+                ? ct.thresholdDisplay(tc.threshold)
+                : `value ${tc.threshold}`;
             })()}
           </div>
         </div>
         <div>
           <div className="text-gray-500 text-xs mb-1">Expires</div>
-          <div className={`font-medium ${statusType === "expired" ? "text-gray-500" : "text-white"}`}>
+          <div
+            className={`font-medium ${
+              statusType === "expired" ? "text-gray-500" : "text-white"
+            }`}
+          >
             {expiresAt.toLocaleDateString()}
           </div>
         </div>
@@ -110,7 +149,9 @@ function PolicyCard({ p }: { p: PolicyData }) {
 
       {isActive && (
         <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between">
-          <span className="text-xs text-gray-500">Trigger a payout or file a claim</span>
+          <span className="text-xs text-gray-500">
+            Trigger a payout or file a claim
+          </span>
           <div className="flex gap-2">
             <Link
               href={`/claim?policy=${pubkey}`}
@@ -150,15 +191,18 @@ function CollapsibleCategory({
   statusFilter,
 }: CollapsibleCategoryProps) {
   const activeCount = useMemo(
-    () => policies.filter((p) => getPolicyStatus(p.account) === "active").length,
+    () =>
+      policies.filter((p) => getPolicyStatus(p.account) === "active").length,
     [policies]
   );
   const claimedCount = useMemo(
-    () => policies.filter((p) => getPolicyStatus(p.account) === "claimed").length,
+    () =>
+      policies.filter((p) => getPolicyStatus(p.account) === "claimed").length,
     [policies]
   );
   const expiredCount = useMemo(
-    () => policies.filter((p) => getPolicyStatus(p.account) === "expired").length,
+    () =>
+      policies.filter((p) => getPolicyStatus(p.account) === "expired").length,
     [policies]
   );
 
@@ -216,7 +260,9 @@ function CollapsibleCategory({
       {isOpen && (
         <div className="space-y-3 pt-1 pl-1">
           {policies.length === 0 ? (
-            <p className="text-sm text-gray-500 py-4 text-center">{emptyLabel}</p>
+            <p className="text-sm text-gray-500 py-4 text-center">
+              {emptyLabel}
+            </p>
           ) : (
             policies.map((p) => <PolicyCard key={p.pubkey} p={p} />)
           )}
@@ -283,7 +329,9 @@ function StatusChip({
   return (
     <button
       onClick={onClick}
-      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${colors[option.value]}`}
+      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+        colors[option.value]
+      }`}
     >
       {option.label}
     </button>
@@ -302,19 +350,24 @@ export default function PortfolioPage() {
 
   // Track which category sections are open. Keyed by coverage type number.
   // undefined = use defaultOpen; true/false = explicit user choice.
-  const [openOverrides, setOpenOverrides] = useState<Record<number, boolean>>({});
+  const [openOverrides, setOpenOverrides] = useState<Record<number, boolean>>(
+    {}
+  );
 
   // ── derived counts (from raw unfiltered policies) ──
   const totalActiveCount = useMemo(
-    () => policies.filter((p) => getPolicyStatus(p.account) === "active").length,
+    () =>
+      policies.filter((p) => getPolicyStatus(p.account) === "active").length,
     [policies]
   );
   const totalClaimedCount = useMemo(
-    () => policies.filter((p) => getPolicyStatus(p.account) === "claimed").length,
+    () =>
+      policies.filter((p) => getPolicyStatus(p.account) === "claimed").length,
     [policies]
   );
   const totalExpiredCount = useMemo(
-    () => policies.filter((p) => getPolicyStatus(p.account) === "expired").length,
+    () =>
+      policies.filter((p) => getPolicyStatus(p.account) === "expired").length,
     [policies]
   );
 
@@ -327,9 +380,15 @@ export default function PortfolioPage() {
   // ── filtered policies ──
   const filteredPolicies = useMemo(() => {
     return policies.filter((p) => {
-      if (statusFilter !== "all" && getPolicyStatus(p.account) !== statusFilter) return false;
-      if (categoryFilter !== "all" && p.account.coverageType !== categoryFilter) return false;
-      if (searchQuery && !p.pubkey.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      if (statusFilter !== "all" && getPolicyStatus(p.account) !== statusFilter)
+        return false;
+      if (categoryFilter !== "all" && p.account.coverageType !== categoryFilter)
+        return false;
+      if (
+        searchQuery &&
+        !p.pubkey.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+        return false;
       return true;
     });
   }, [policies, statusFilter, categoryFilter, searchQuery]);
@@ -350,7 +409,10 @@ export default function PortfolioPage() {
     const typesInResult = Object.keys(grouped).map(Number);
 
     // If a category filter is active and there are no results, still show that category
-    if (categoryFilter !== "all" && !typesInResult.includes(categoryFilter as number)) {
+    if (
+      categoryFilter !== "all" &&
+      !typesInResult.includes(categoryFilter as number)
+    ) {
       typesInResult.push(categoryFilter as number);
     }
     return typesInResult.sort((a, b) => a - b);
@@ -400,7 +462,9 @@ export default function PortfolioPage() {
   if (!wallet) {
     return (
       <div className="text-center py-20 space-y-4">
-        <p className="text-gray-400">Connect your wallet to view your policies.</p>
+        <p className="text-gray-400">
+          Connect your wallet to view your policies.
+        </p>
         <Link
           href="/buy"
           className="inline-block text-sm border border-[var(--accent)]/40 text-[var(--accent)] px-5 py-2 rounded-lg hover:border-[var(--accent)] transition-colors"
@@ -416,8 +480,12 @@ export default function PortfolioPage() {
       {/* ── Page header ── */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">My Portfolio</h1>
-          <p className="text-gray-400 mt-1">Your active and historical policies.</p>
+          <h1 className="text-3xl font-bold text-white tracking-tight">
+            My Portfolio
+          </h1>
+          <p className="text-gray-400 mt-1">
+            Your active and historical policies.
+          </p>
         </div>
         {/* Summary pills */}
         {!loading && policies.length > 0 && (
@@ -446,7 +514,9 @@ export default function PortfolioPage() {
         <div className="card bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 space-y-4">
           {/* Status chips */}
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-gray-500 font-medium mr-1 shrink-0">Status:</span>
+            <span className="text-xs text-gray-500 font-medium mr-1 shrink-0">
+              Status:
+            </span>
             {STATUS_OPTIONS.map((opt) => (
               <StatusChip
                 key={opt.value}
@@ -460,13 +530,19 @@ export default function PortfolioPage() {
           {/* Category dropdown + search in one row */}
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1 space-y-1">
-              <label className="text-xs text-gray-500 font-medium">Category</label>
+              <label className="text-xs text-gray-500 font-medium">
+                Category
+              </label>
               <select
                 id="portfolio-category-filter"
                 className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg p-2 text-sm text-white focus:outline-none focus:border-[var(--accent)] transition-colors"
-                value={categoryFilter === "all" ? "all" : categoryFilter.toString()}
+                value={
+                  categoryFilter === "all" ? "all" : categoryFilter.toString()
+                }
                 onChange={(e) =>
-                  setCategoryFilter(e.target.value === "all" ? "all" : Number(e.target.value))
+                  setCategoryFilter(
+                    e.target.value === "all" ? "all" : Number(e.target.value)
+                  )
                 }
               >
                 <option value="all">All Categories</option>
@@ -479,7 +555,9 @@ export default function PortfolioPage() {
             </div>
 
             <div className="flex-[2] space-y-1">
-              <label className="text-xs text-gray-500 font-medium">Search by pubkey</label>
+              <label className="text-xs text-gray-500 font-medium">
+                Search by pubkey
+              </label>
               <div className="relative">
                 <input
                   id="portfolio-search"
@@ -535,7 +613,8 @@ export default function PortfolioPage() {
       {!loading && !error && availableTypes.length >= 2 && (
         <div className="flex items-center justify-between">
           <span className="text-xs text-gray-500">
-            {sortedTypes.length} {sortedTypes.length === 1 ? "category" : "categories"}
+            {sortedTypes.length}{" "}
+            {sortedTypes.length === 1 ? "category" : "categories"}
           </span>
           <div className="flex gap-3">
             <button
@@ -574,10 +653,12 @@ export default function PortfolioPage() {
       {!loading && !error && policies.length === 0 && (
         <div className="card p-12 text-center space-y-4">
           <div className="text-4xl">🛡</div>
-          <div className="text-white font-semibold text-lg">No policies yet</div>
+          <div className="text-white font-semibold text-lg">
+            No policies yet
+          </div>
           <p className="text-gray-400 text-sm max-w-xs mx-auto">
-            Buy parametric coverage and get paid automatically when real-world events are confirmed
-            by oracles.
+            Buy parametric coverage and get paid automatically when real-world
+            events are confirmed by oracles.
           </p>
           <Link
             href="/buy"
@@ -589,14 +670,22 @@ export default function PortfolioPage() {
       )}
 
       {/* ── Global empty-filtered state (all categories filtered away) ── */}
-      {!loading && !error && policies.length > 0 && sortedTypes.length === 0 && (
-        <div className="card p-8 text-center space-y-2">
-          <div className="text-gray-400">No policies match the selected filters.</div>
-          <button onClick={clearFilters} className="text-[var(--accent)] text-sm hover:underline">
-            Clear filters
-          </button>
-        </div>
-      )}
+      {!loading &&
+        !error &&
+        policies.length > 0 &&
+        sortedTypes.length === 0 && (
+          <div className="card p-8 text-center space-y-2">
+            <div className="text-gray-400">
+              No policies match the selected filters.
+            </div>
+            <button
+              onClick={clearFilters}
+              className="text-[var(--accent)] text-sm hover:underline"
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
 
       {/* ── Category sections ── */}
       {!loading && !error && sortedTypes.length > 0 && (
@@ -617,7 +706,10 @@ export default function PortfolioPage() {
       {/* ── Footer CTA ── */}
       {!loading && policies.length > 0 && (
         <div className="text-center pt-4 border-t border-[var(--border)] mt-8">
-          <Link href="/buy" className="text-sm text-[var(--accent)] hover:underline inline-block mt-4">
+          <Link
+            href="/buy"
+            className="text-sm text-[var(--accent)] hover:underline inline-block mt-4"
+          >
             + Buy more coverage
           </Link>
         </div>

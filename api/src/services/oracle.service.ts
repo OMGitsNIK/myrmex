@@ -59,6 +59,11 @@ function loadOracleKeypair(): Keypair {
       Buffer.from(JSON.parse(process.env.ORACLE_KEYPAIR_JSON))
     );
   }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "ORACLE_KEYPAIR_JSON must be set in production — refusing to fall back to a disk key"
+    );
+  }
   const keyPath = path.join(
     process.env.HOME || "~",
     ".config/solana/oracle.json"
@@ -154,6 +159,8 @@ async function fetchEarthquake(): Promise<{
     "https://earthquake.usgs.gov/fdsnws/event/1/query" +
     "?format=geojson&minmagnitude=4.5&orderby=magnitude&limit=1";
   const resp = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+  if (!resp.ok)
+    throw new Error(`USGS earthquake returned ${resp.status} — skipping post`);
   const rawPayload = await resp.text();
   const data = JSON.parse(rawPayload) as any;
   const features = data.features ?? [];
@@ -200,6 +207,8 @@ async function fetchFlood(): Promise<{
 }> {
   const url = `https://waterservices.usgs.gov/nwis/iv/?format=json&sites=${USGS_FLOOD_SITE}&parameterCd=00065`;
   const resp = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+  if (!resp.ok)
+    throw new Error(`USGS flood returned ${resp.status} — skipping post`);
   const rawPayload = await resp.text();
   const data = JSON.parse(rawPayload) as any;
 
@@ -257,6 +266,8 @@ async function fetchCropComposite(): Promise<{
     `&timezone=auto&start_date=${start14}&end_date=${end}`;
 
   const resp = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+  if (!resp.ok)
+    throw new Error(`Open-Meteo crop returned ${resp.status} — skipping post`);
   const rawPayload = await resp.text();
   const data = JSON.parse(rawPayload) as any;
   const daily = data.daily ?? {};
@@ -359,6 +370,8 @@ async function fetchStablecoinPrice(): Promise<{
     "https://api.coingecko.com/api/v3/simple/price?ids=usd-coin,tether&vs_currencies=usd&precision=6",
     { signal: AbortSignal.timeout(10_000) }
   );
+  if (!resp.ok)
+    throw new Error(`CoinGecko returned ${resp.status} — skipping post`);
   const rawPayload = await resp.text();
   const data = JSON.parse(rawPayload) as any;
   const usdcPrice = data?.["usd-coin"]?.usd ?? 1.0;

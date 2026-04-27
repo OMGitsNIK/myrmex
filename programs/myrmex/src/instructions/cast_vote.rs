@@ -1,13 +1,22 @@
 use anchor_lang::prelude::*;
 
 use crate::errors::MyrmexError;
-use crate::state::{GovernanceProposal, VoteRecord};
+use crate::state::{GovernanceProposal, StakeAccount, VoteRecord};
 
 #[derive(Accounts)]
 #[instruction(proposal_id: u64)]
 pub struct CastVote<'info> {
     #[account(mut)]
     pub voter: Signer<'info>,
+
+    /// Voter must have MYR staked; their stake weight is used as the vote weight.
+    #[account(
+        seeds = [b"stake", voter.key().as_ref()],
+        bump = voter_stake.bump,
+        constraint = voter_stake.owner == voter.key() @ MyrmexError::Unauthorized,
+        constraint = voter_stake.amount_staked > 0 @ MyrmexError::Unauthorized,
+    )]
+    pub voter_stake: Account<'info, StakeAccount>,
 
     #[account(
         mut,
@@ -38,16 +47,17 @@ pub fn handler(ctx: Context<CastVote>, _proposal_id: u64, vote: bool) -> Result<
         MyrmexError::PolicyExpired
     );
 
+    let weight = ctx.accounts.voter_stake.amount_staked;
     let proposal = &mut ctx.accounts.proposal;
     if vote {
         proposal.votes_for = proposal
             .votes_for
-            .checked_add(1)
+            .checked_add(weight)
             .ok_or(error!(MyrmexError::MathOverflow))?;
     } else {
         proposal.votes_against = proposal
             .votes_against
-            .checked_add(1)
+            .checked_add(weight)
             .ok_or(error!(MyrmexError::MathOverflow))?;
     }
 

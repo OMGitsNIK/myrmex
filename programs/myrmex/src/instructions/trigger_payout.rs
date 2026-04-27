@@ -76,10 +76,17 @@ pub fn handler(ctx: Context<TriggerPayout>) -> Result<()> {
     {
         let oracle_report = &ctx.accounts.oracle_report;
 
-        // Oracle report must be fresh — protects against stale report replay attacks
+        // Oracle report must be fresh and not future-dated.
+        // reject if reported_at > now (future-dated would make age=0 with saturating_sub,
+        // bypassing the freshness check) and if the report is older than MAX_AGE_SECS.
+        require!(
+            oracle_report.reported_at <= clock.unix_timestamp,
+            MyrmexError::OracleReportStale
+        );
         let age = clock
             .unix_timestamp
-            .saturating_sub(oracle_report.reported_at);
+            .checked_sub(oracle_report.reported_at)
+            .ok_or(error!(MyrmexError::MathOverflow))?;
         require!(
             age <= OracleReport::MAX_AGE_SECS,
             MyrmexError::OracleReportStale
