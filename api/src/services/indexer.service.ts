@@ -48,11 +48,14 @@ export function startIndexer() {
     });
 
     // PayoutExecuted event handling
-    program.addEventListener("PayoutExecuted", (event: any, slot, signature) => {
-      db.prepare(
-        "INSERT OR IGNORE INTO events (event_type, tx_signature, data) VALUES (?, ?, ?)"
-      ).run("PayoutExecuted", signature, JSON.stringify(event));
-    });
+    program.addEventListener(
+      "PayoutExecuted",
+      (event: any, slot, signature) => {
+        db.prepare(
+          "INSERT OR IGNORE INTO events (event_type, tx_signature, data) VALUES (?, ?, ?)"
+        ).run("PayoutExecuted", signature, JSON.stringify(event));
+      }
+    );
 
     console.log("Structured event indexer started for:", programId.toBase58());
   } catch (e) {

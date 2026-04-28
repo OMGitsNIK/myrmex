@@ -118,10 +118,7 @@ pub fn handler(ctx: Context<CreatePolicy>, params: CreatePolicyParams) -> Result
         // 1. Verify it's the Ed25519 precompile
         use std::str::FromStr;
         let ed25519_id = Pubkey::from_str("Ed25519SigVerify111111111111111111111111111").unwrap();
-        require!(
-            prev_ix.program_id == ed25519_id,
-            MyrmexError::Unauthorized
-        );
+        require!(prev_ix.program_id == ed25519_id, MyrmexError::Unauthorized);
 
         // 2. Verify the public key in the signature matches the pricing_authority
         // In the Ed25519 precompile data, the public key starts at offset 16 (header is 16 bytes)

@@ -125,12 +125,10 @@ router.post("/", async (req, res) => {
 
     const valid = ed25519.verify(sigBytes, msgBytes, pkBytes);
     if (!valid) {
-      return res
-        .status(403)
-        .json({
-          error:
-            "Signature verification failed — only the policyholder can simulate",
-        });
+      return res.status(403).json({
+        error:
+          "Signature verification failed — only the policyholder can simulate",
+      });
     }
 
     const poolPk = policyAccount.pool as PublicKey;
