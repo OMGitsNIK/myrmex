@@ -67,14 +67,7 @@ jobs:
 
       - name: Install Solana CLI (Agave 2.2.21)
         if: steps.cache-toolchain.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p "$HOME/.local/share/solana/install"
-          curl -sSfL \
-            "https://github.com/anza-xyz/agave/releases/download/v2.2.21/solana-release-x86_64-unknown-linux-gnu.tar.bz2" \
-            | tar xjC "$HOME/.local/share/solana/install"
-          ln -sfn \
-            "$HOME/.local/share/solana/install/solana-release" \
-            "$HOME/.local/share/solana/install/active_release"
+        run: sh -c "$(curl -sSfL https://release.solana.com/v2.2.21/install)"
 
       - name: Add Solana to PATH
         run: echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
