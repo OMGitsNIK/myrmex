@@ -6,33 +6,23 @@ const PROGRAM_ID = new PublicKey(
   process.env.PROGRAM_ID || "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan"
 );
 
-// 8-byte Anchor discriminator for PolicyVault — sha256("account:PolicyVault")[0..8]
-const POLICY_VAULT_DISCRIMINATOR = Buffer.from([
-  190, 14, 42, 53, 55, 50, 185, 198,
-]);
+// Current on-chain PolicyVault account size in bytes.
+// Stale devnet accounts from before oracle_pubkey was added to TriggerCondition
+// are 149 bytes — fetching only 181-byte accounts skips them automatically.
+const POLICY_VAULT_LEN = 181;
 
 async function expireStalePolices() {
   const { program, provider } = getAnchorProgram();
   const connection = provider.connection;
   const now = Math.floor(Date.now() / 1000);
 
-  // Fetch raw accounts and decode individually — bulk .all() throws if ANY account
-  // has a stale layout (e.g. old devnet accounts created before oracle_pubkey was
-  // added to TriggerCondition). Per-account decoding lets us skip malformed ones.
+  // Filter by exact account size to skip stale devnet accounts that have a
+  // different layout (149 bytes vs 181). Bulk .all() fails on any decode error.
   const rawAccounts = await connection.getProgramAccounts(PROGRAM_ID, {
-    filters: [
-      {
-        memcmp: {
-          offset: 0,
-          bytes: POLICY_VAULT_DISCRIMINATOR.toString("base64"),
-        },
-      },
-    ],
-    encoding: "base64",
+    filters: [{ dataSize: POLICY_VAULT_LEN }],
   });
 
   let expired = 0;
-  let skipped = 0;
 
   for (const { pubkey, account } of rawAccounts) {
     let decoded: any;
@@ -42,7 +32,6 @@ async function expireStalePolices() {
         account.data
       );
     } catch {
-      skipped++;
       continue;
     }
 
@@ -64,11 +53,6 @@ async function expireStalePolices() {
     }
   }
 
-  if (skipped > 0) {
-    console.warn(
-      `[cron] Skipped ${skipped} malformed account(s) — stale devnet data`
-    );
-  }
   if (expired > 0) {
     console.log(`[cron] Expired ${expired} polic(ies) this cycle`);
   }
