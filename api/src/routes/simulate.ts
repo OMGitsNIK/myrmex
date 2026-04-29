@@ -97,8 +97,13 @@ router.post("/", async (req, res) => {
         .json({ error: "signature and message are required" });
     }
 
+    let policyPk: PublicKey;
+    try {
+      policyPk = new PublicKey(policyPubkeyStr);
+    } catch {
+      return res.status(400).json({ error: "Invalid policy public key" });
+    }
     const { program, provider } = getAnchorProgram();
-    const policyPk = new PublicKey(policyPubkeyStr);
     const policyAccount = (await (program as any).account.policyVault.fetch(
       policyPk
     )) as any;
@@ -125,12 +130,10 @@ router.post("/", async (req, res) => {
 
     const valid = ed25519.verify(sigBytes, msgBytes, pkBytes);
     if (!valid) {
-      return res
-        .status(403)
-        .json({
-          error:
-            "Signature verification failed — only the policyholder can simulate",
-        });
+      return res.status(403).json({
+        error:
+          "Signature verification failed — only the policyholder can simulate",
+      });
     }
 
     const poolPk = policyAccount.pool as PublicKey;
@@ -209,9 +212,14 @@ router.post("/", async (req, res) => {
 // GET /api/simulate-trigger/oracle-value/:policy
 // Returns the oracle value needed to trigger the given policy's condition.
 router.get("/oracle-value/:policy", async (req, res) => {
+  let policyPk: PublicKey;
+  try {
+    policyPk = new PublicKey(req.params.policy);
+  } catch {
+    return res.status(400).json({ error: "Invalid policy public key" });
+  }
   try {
     const { program } = getAnchorProgram();
-    const policyPk = new PublicKey(req.params.policy);
     const policyAccount = (await (program as any).account.policyVault.fetch(
       policyPk
     )) as any;
@@ -231,6 +239,7 @@ router.get("/oracle-value/:policy", async (req, res) => {
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
+  return;
 });
 
 export { router as simulateRouter };

@@ -52,13 +52,22 @@ async function expireStalePolices() {
         console.log(`[cron] Expired ${expired} polic(ies) this cycle`);
     }
 }
+let isRunning = false;
 function startCron() {
     node_cron_1.default.schedule("*/10 * * * *", async () => {
+        if (isRunning) {
+            console.log("[cron] Previous sweep still running — skipping cycle");
+            return;
+        }
+        isRunning = true;
         try {
             await expireStalePolices();
         }
         catch (e) {
             console.error("[cron] Expiry sweep failed:", e);
+        }
+        finally {
+            isRunning = false;
         }
     });
     console.log("Policy expiry cron started (every 10 minutes)");

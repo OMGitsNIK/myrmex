@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.startIndexer = startIndexer;
 exports.getStats = getStats;
+exports.bustStatsCache = bustStatsCache;
 const anchor_service_1 = require("./anchor.service");
 const schema_1 = __importDefault(require("../db/schema"));
 function startIndexer() {
@@ -46,7 +47,10 @@ function startIndexer() {
         console.error("[indexer] Failed to start:", e);
     }
 }
-function getStats() {
+let statsCache = null;
+let statsCacheAt = 0;
+const STATS_TTL_MS = 60000;
+function computeStats() {
     const events = schema_1.default
         .prepare("SELECT event_type, data FROM events")
         .all();
@@ -75,4 +79,15 @@ function getStats() {
         total_payouts_executed: totalPayouts,
         last_sync_time: new Date().toISOString(),
     };
+}
+function getStats() {
+    const now = Date.now();
+    if (statsCache && now - statsCacheAt < STATS_TTL_MS)
+        return statsCache;
+    statsCache = computeStats();
+    statsCacheAt = now;
+    return statsCache;
+}
+function bustStatsCache() {
+    statsCache = null;
 }

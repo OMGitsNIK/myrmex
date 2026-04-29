@@ -58,6 +58,7 @@ pub struct CreatePolicy<'info> {
     )]
     pub pool_vault: Account<'info, TokenAccount>,
 
+    #[account(address = pool.usdc_mint @ MyrmexError::Unauthorized)]
     pub usdc_mint: Account<'info, Mint>,
 
     pub token_program: Program<'info, Token>,

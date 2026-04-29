@@ -101,8 +101,14 @@ router.post("/", async (req, res) => {
                 .status(400)
                 .json({ error: "signature and message are required" });
         }
+        let policyPk;
+        try {
+            policyPk = new web3_js_1.PublicKey(policyPubkeyStr);
+        }
+        catch {
+            return res.status(400).json({ error: "Invalid policy public key" });
+        }
         const { program, provider } = (0, anchor_service_1.getAnchorProgram)();
-        const policyPk = new web3_js_1.PublicKey(policyPubkeyStr);
         const policyAccount = (await program.account.policyVault.fetch(policyPk));
         // Verify the caller signed the expected message with the policyholder's key
         const onChainPolicyholder = policyAccount.policyholder.toBase58();
@@ -118,9 +124,7 @@ router.post("/", async (req, res) => {
         }
         const valid = ed25519_1.ed25519.verify(sigBytes, msgBytes, pkBytes);
         if (!valid) {
-            return res
-                .status(403)
-                .json({
+            return res.status(403).json({
                 error: "Signature verification failed — only the policyholder can simulate",
             });
         }
@@ -174,9 +178,15 @@ router.post("/", async (req, res) => {
 // GET /api/simulate-trigger/oracle-value/:policy
 // Returns the oracle value needed to trigger the given policy's condition.
 router.get("/oracle-value/:policy", async (req, res) => {
+    let policyPk;
+    try {
+        policyPk = new web3_js_1.PublicKey(req.params.policy);
+    }
+    catch {
+        return res.status(400).json({ error: "Invalid policy public key" });
+    }
     try {
         const { program } = (0, anchor_service_1.getAnchorProgram)();
-        const policyPk = new web3_js_1.PublicKey(req.params.policy);
         const policyAccount = (await program.account.policyVault.fetch(policyPk));
         const threshold = policyAccount.triggerCondition.threshold.toNumber();
         const comparison = policyAccount.triggerCondition.comparison;
@@ -192,4 +202,5 @@ router.get("/oracle-value/:policy", async (req, res) => {
     catch (e) {
         res.status(500).json({ error: e.message });
     }
+    return;
 });

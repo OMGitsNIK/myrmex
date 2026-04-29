@@ -6,9 +6,14 @@ const router = Router();
 
 // GET /api/policies/:wallet
 router.get("/:wallet", async (req, res) => {
+  let wallet: PublicKey;
+  try {
+    wallet = new PublicKey(req.params.wallet);
+  } catch {
+    return res.status(400).json({ error: "Invalid wallet public key" });
+  }
   try {
     const { program, connection } = getAnchorProgram();
-    const wallet = new PublicKey(req.params.wallet);
 
     // Fetch all PolicyVault accounts for this wallet regardless of size,
     // then decode per-account so old-format accounts are silently skipped.
@@ -54,6 +59,7 @@ router.get("/:wallet", async (req, res) => {
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
+  return;
 });
 
 export { router as policyRouter };

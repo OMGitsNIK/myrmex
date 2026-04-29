@@ -16,6 +16,9 @@ db.exec(`
     created_at INTEGER DEFAULT (unixepoch())
   );
 
+  CREATE INDEX IF NOT EXISTS idx_events_event_type ON events (event_type);
+  CREATE INDEX IF NOT EXISTS idx_events_created_at ON events (created_at);
+
   CREATE TABLE IF NOT EXISTS policies (
     pubkey TEXT PRIMARY KEY,
     policyholder TEXT,

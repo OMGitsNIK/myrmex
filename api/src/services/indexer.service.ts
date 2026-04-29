@@ -62,7 +62,11 @@ export function startIndexer() {
   }
 }
 
-export function getStats() {
+let statsCache: ReturnType<typeof computeStats> | null = null;
+let statsCacheAt = 0;
+const STATS_TTL_MS = 60_000;
+
+function computeStats() {
   const events = db
     .prepare("SELECT event_type, data FROM events")
     .all() as any[];
@@ -93,4 +97,16 @@ export function getStats() {
     total_payouts_executed: totalPayouts,
     last_sync_time: new Date().toISOString(),
   };
+}
+
+export function getStats() {
+  const now = Date.now();
+  if (statsCache && now - statsCacheAt < STATS_TTL_MS) return statsCache;
+  statsCache = computeStats();
+  statsCacheAt = now;
+  return statsCache;
+}
+
+export function bustStatsCache() {
+  statsCache = null;
 }

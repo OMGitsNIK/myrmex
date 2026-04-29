@@ -8,9 +8,15 @@ const router = (0, express_1.Router)();
 exports.policyByPubkeyRouter = router;
 // GET /api/policy/:pubkey — fetch a single policy account by its address
 router.get("/:pubkey", async (req, res) => {
+    let pk;
+    try {
+        pk = new web3_js_1.PublicKey(req.params.pubkey);
+    }
+    catch {
+        return res.status(400).json({ error: "Invalid policy public key" });
+    }
     try {
         const { program } = (0, anchor_service_1.getAnchorProgram)();
-        const pk = new web3_js_1.PublicKey(req.params.pubkey);
         const acc = (await program.account.policyVault.fetch(pk));
         res.json({
             pubkey: pk.toBase58(),
@@ -37,4 +43,5 @@ router.get("/:pubkey", async (req, res) => {
     catch (e) {
         res.status(404).json({ error: e.message });
     }
+    return;
 });

@@ -54,6 +54,15 @@ const simulateLimiter = (0, express_rate_limit_1.default)({
     message: { error: "Simulate rate limit exceeded (5 req/min)" },
 });
 app.use("/api/simulate-trigger", simulateLimiter);
+// Quote proxies to Python pricing service — cap to prevent overload
+const quoteLimiter = (0, express_rate_limit_1.default)({
+    windowMs: 60000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Quote rate limit exceeded (20 req/min)" },
+});
+app.use("/api/quote", quoteLimiter);
 // Cap request body size
 app.use(express_1.default.json({ limit: "10kb" }));
 app.use("/api/policies", policies_1.policyRouter);
