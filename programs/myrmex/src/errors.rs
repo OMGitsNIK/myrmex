@@ -50,4 +50,16 @@ pub enum MyrmexError {
     ProposalNotPassed,
     #[msg("Invalid action type for proposal execution")]
     InvalidActionType,
+    #[msg("Proposal must be queued through the timelock before execution")]
+    ProposalNotQueued,
+    #[msg("Payout has been vetoed by the pool authority")]
+    PayoutVetoed,
+    #[msg("Payout delay window has already passed; veto no longer possible")]
+    PayoutDelayPassed,
+    #[msg("Oracle multisig threshold not met — required signers missing or unauthorized")]
+    MultisigThresholdNotMet,
+    #[msg("Invalid tranche — must be 0 (junior), 1 (mezzanine), or 2 (senior)")]
+    InvalidTranche,
+    #[msg("Insufficient tranche liquidity for withdrawal")]
+    InsufficientTrancheLiquidity,
 }

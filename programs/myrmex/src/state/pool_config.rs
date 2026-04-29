@@ -9,9 +9,11 @@ pub struct PoolConfig {
     /// Maximum coverage ratio in basis points of total_liquidity (e.g. 8000 = 80%)
     pub max_coverage_bps: u64,
     pub bump: u8,
+    /// Running total of USDC held in the reserve vault (informational; canonical source is the vault balance)
+    pub reserve_balance: u64,
 }
 
 impl PoolConfig {
-    // 8 discriminator + 32 + 32 + 8 + 8 + 1
-    pub const LEN: usize = 89;
+    // 8 discriminator + 32 + 32 + 8 + 8 + 1 + 8
+    pub const LEN: usize = 97;
 }

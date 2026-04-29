@@ -47,6 +47,7 @@ pub fn handler(
     config.min_premium_bps = min_premium_bps;
     config.max_coverage_bps = max_coverage_bps;
     config.bump = ctx.bumps.pool_config;
+    config.reserve_balance = 0;
 
     Ok(())
 }

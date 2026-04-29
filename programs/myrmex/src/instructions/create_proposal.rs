@@ -66,6 +66,8 @@ pub fn handler(
     proposal.bump = ctx.bumps.proposal;
     proposal.action_type = action_type;
     proposal.action_payload = action_payload;
+    proposal.queued = false;
+    proposal.effective_at = 0;
 
     msg!(
         "Proposal #{} created: action_type={} voting ends at {}",

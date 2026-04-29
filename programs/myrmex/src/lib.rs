@@ -141,4 +141,49 @@ pub mod myrmex {
     pub fn execute_proposal(ctx: Context<ExecuteProposal>, proposal_id: u64) -> Result<()> {
         instructions::execute_proposal::handler(ctx, proposal_id)
     }
+
+    // ── Feature 1: Governance 48-hour timelock ────────────────────────────
+    pub fn queue_proposal(ctx: Context<QueueProposal>, proposal_id: u64) -> Result<()> {
+        instructions::queue_proposal::handler(ctx, proposal_id)
+    }
+
+    // ── Feature 2: Payout delay ───────────────────────────────────────────
+    pub fn queue_payout(ctx: Context<QueuePayout>) -> Result<()> {
+        instructions::queue_payout::handler(ctx)
+    }
+
+    pub fn finalize_payout(ctx: Context<FinalizePayout>) -> Result<()> {
+        instructions::finalize_payout::handler(ctx)
+    }
+
+    pub fn veto_payout(ctx: Context<VetoPayout>) -> Result<()> {
+        instructions::veto_payout::handler(ctx)
+    }
+
+    // ── Feature 3: Reserve fund ───────────────────────────────────────────
+    pub fn initialize_reserve(ctx: Context<InitializeReserve>) -> Result<()> {
+        instructions::initialize_reserve::handler(ctx)
+    }
+
+    // ── Feature 4: Oracle multi-sig ───────────────────────────────────────
+    pub fn initialize_oracle_multisig(
+        ctx: Context<InitializeOracleMultisig>,
+        signers: [Pubkey; 3],
+        threshold: u8,
+    ) -> Result<()> {
+        instructions::initialize_oracle_multisig::handler(ctx, signers, threshold)
+    }
+
+    // ── Feature 5: Tranched liquidity ─────────────────────────────────────
+    pub fn fund_tranche(ctx: Context<FundTranche>, amount: u64, tranche: u8) -> Result<()> {
+        instructions::fund_tranche::handler(ctx, amount, tranche)
+    }
+
+    pub fn withdraw_tranche(
+        ctx: Context<WithdrawTranche>,
+        lp_amount: u64,
+        tranche: u8,
+    ) -> Result<()> {
+        instructions::withdraw_tranche::handler(ctx, lp_amount, tranche)
+    }
 }

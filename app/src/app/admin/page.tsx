@@ -3,7 +3,8 @@
 import { API_URL, COVERAGE_NAMES, USDC_DECIMALS } from "@/lib/constants";
 import { useEffect, useState, useCallback } from "react";
 import { useAnchorProgram } from "@/hooks/useAnchorProgram";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { toast } from "sonner";
 
 const PROGRAM_ID = new PublicKey(
@@ -355,6 +356,9 @@ export default function GovernanceDashboardPage() {
 
       {/* Proposal Execution Panel */}
       <ExecuteProposalPanel pools={pools} />
+
+      {/* Payout Queue Panel */}
+      <PayoutQueuePanel />
     </div>
   );
 }
@@ -383,7 +387,7 @@ function decodeActionPayload(actionType: number, payload: number[]): string {
   return "Unknown payload";
 }
 
-function ExecuteProposalPanel({ pools: _pools }: { pools: PoolResponse[] }) {
+function ExecuteProposalPanel({ pools: _ }: { pools: PoolResponse[] }) {
   const { program, wallet, walletPublicKey } = useAnchorProgram();
   const [proposals, setProposals] = useState<ProposalAccount[]>([]);
   const [loadingProposals, setLoadingProposals] = useState(false);
@@ -554,6 +558,247 @@ function ExecuteProposalPanel({ pools: _pools }: { pools: PoolResponse[] }) {
             </button>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+interface PendingPayoutAccount {
+  pubkey: string;
+  policy: string;
+  pool: string;
+  policyholder: string;
+  amount: number;
+  executeAfter: number;
+  vetoed: boolean;
+}
+
+function timeUntil(ts: number): string {
+  const diff = ts * 1000 - Date.now();
+  if (diff <= 0) return "Ready";
+  const h = Math.floor(diff / 3_600_000);
+  const m = Math.floor((diff % 3_600_000) / 60_000);
+  return h > 0 ? `${h}h ${m}m remaining` : `${m}m remaining`;
+}
+
+function PayoutQueuePanel() {
+  const { program, wallet } = useAnchorProgram();
+  const [payouts, setPayouts] = useState<PendingPayoutAccount[]>([]);
+  const [loadingPayouts, setLoadingPayouts] = useState(false);
+  const [acting, setActing] = useState<string | null>(null);
+
+  const fetchPayouts = useCallback(async () => {
+    if (!program) return;
+    setLoadingPayouts(true);
+    try {
+      const accounts = await (program as any).account.pendingPayout.all();
+      const parsed: PendingPayoutAccount[] = accounts.map((a: any) => ({
+        pubkey: a.publicKey.toBase58(),
+        policy: a.account.policy.toBase58(),
+        pool: a.account.pool.toBase58(),
+        policyholder: a.account.policyholder.toBase58(),
+        amount: Number(a.account.amount),
+        executeAfter: Number(a.account.executeAfter ?? a.account.execute_after),
+        vetoed: a.account.vetoed,
+      }));
+      setPayouts(parsed);
+    } catch (e: unknown) {
+      console.error("[payout-queue] fetch:", (e as Error).message);
+    } finally {
+      setLoadingPayouts(false);
+    }
+  }, [program]);
+
+  useEffect(() => {
+    fetchPayouts();
+  }, [fetchPayouts]);
+
+  const handleFinalize = async (payout: PendingPayoutAccount) => {
+    if (!program || !wallet) {
+      toast.error("Connect wallet to finalize");
+      return;
+    }
+    setActing(payout.pubkey);
+    try {
+      const poolPk = new PublicKey(payout.pool);
+      const policyPk = new PublicKey(payout.policy);
+      const policyholderPk = new PublicKey(payout.policyholder);
+
+      const poolAccount = await (program as any).account.riskPool.fetch(poolPk);
+      const poolVault = poolAccount.vault as PublicKey;
+      const usdcMint = poolAccount.usdcMint as PublicKey;
+
+      const [poolConfigPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("pool_config"), poolPk.toBuffer()],
+        PROGRAM_ID
+      );
+      const [pendingPayoutPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("pending_payout"), policyPk.toBuffer()],
+        PROGRAM_ID
+      );
+      const policyholderUsdc = getAssociatedTokenAddressSync(
+        usdcMint,
+        policyholderPk
+      );
+
+      await (program as any).methods
+        .finalizePayout()
+        .accounts({
+          caller: wallet.publicKey,
+          pendingPayout: pendingPayoutPda,
+          policy: policyPk,
+          pool: poolPk,
+          poolConfig: poolConfigPda,
+          policyholderUsdc,
+          poolVault,
+          reserveVault: null,
+          policyholder: policyholderPk,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc();
+      toast.success("Payout finalized — USDC sent to policyholder");
+      setPayouts((prev) => prev.filter((p) => p.pubkey !== payout.pubkey));
+    } catch (e: unknown) {
+      const msg = (e as Error).message ?? "";
+      if (msg.includes("TimelockNotExpired")) {
+        toast.error("48-hour delay has not passed yet");
+      } else {
+        toast.error("Finalize failed", { description: msg });
+      }
+    } finally {
+      setActing(null);
+    }
+  };
+
+  const handleVeto = async (payout: PendingPayoutAccount) => {
+    if (!program || !wallet) {
+      toast.error("Connect wallet to veto");
+      return;
+    }
+    setActing(payout.pubkey + "_veto");
+    try {
+      const poolPk = new PublicKey(payout.pool);
+      const policyPk = new PublicKey(payout.policy);
+
+      const [pendingPayoutPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("pending_payout"), policyPk.toBuffer()],
+        PROGRAM_ID
+      );
+
+      await (program as any).methods
+        .vetoPayout()
+        .accounts({
+          authority: wallet.publicKey,
+          pool: poolPk,
+          policy: policyPk,
+          pendingPayout: pendingPayoutPda,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc();
+      toast.success("Payout vetoed — policy restored to active");
+      setPayouts((prev) => prev.filter((p) => p.pubkey !== payout.pubkey));
+    } catch (e: unknown) {
+      const msg = (e as Error).message ?? "";
+      if (msg.includes("Unauthorized")) {
+        toast.error("Only the pool authority can veto");
+      } else if (msg.includes("PayoutDelayPassed")) {
+        toast.error("Veto window has closed — payout delay already passed");
+      } else {
+        toast.error("Veto failed", { description: msg });
+      }
+    } finally {
+      setActing(null);
+    }
+  };
+
+  const now = Math.floor(Date.now() / 1000);
+
+  return (
+    <div className="card p-6 space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-semibold text-white">Payout Queue</h2>
+          <p className="text-xs text-gray-500 mt-1">
+            Pending payouts awaiting the 48-hour timelock. Pool authority can
+            veto before the delay expires; anyone can finalize after.
+          </p>
+        </div>
+        <button
+          onClick={fetchPayouts}
+          disabled={loadingPayouts || !program}
+          className="text-xs text-gray-500 hover:text-[var(--accent)] disabled:opacity-40 transition-colors"
+        >
+          {loadingPayouts ? "Loading…" : "↻ Refresh"}
+        </button>
+      </div>
+
+      {!wallet && (
+        <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-300">
+          Connect your wallet to view and act on pending payouts.
+        </div>
+      )}
+
+      {wallet && !loadingPayouts && payouts.length === 0 && (
+        <div className="py-6 text-center text-sm text-gray-500">
+          No pending payouts in queue.
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {payouts.map((payout) => {
+          const ready = now >= payout.executeAfter;
+          const isActing = acting === payout.pubkey;
+          const isVetoing = acting === payout.pubkey + "_veto";
+          return (
+            <div
+              key={payout.pubkey}
+              className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/30 p-4 space-y-3"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="text-sm font-semibold text-white">
+                    ${(payout.amount / USDC_DECIMALS).toFixed(2)} USDC
+                  </div>
+                  <div className="text-xs text-gray-500 font-mono">
+                    Policy: {payout.policy.slice(0, 10)}…{payout.policy.slice(-6)}
+                  </div>
+                  <div className="text-xs text-gray-600 font-mono">
+                    → {payout.policyholder.slice(0, 10)}…{payout.policyholder.slice(-6)}
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  {ready ? (
+                    <span className="text-xs font-medium text-[var(--accent)]">
+                      ✓ Ready
+                    </span>
+                  ) : (
+                    <span className="text-xs text-yellow-500">
+                      ⏱ {timeUntil(payout.executeAfter)}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleFinalize(payout)}
+                  disabled={!ready || isActing || !wallet}
+                  className="flex-1 bg-[var(--accent)] hover:opacity-90 disabled:opacity-40 text-black font-bold px-3 py-1.5 rounded-lg text-xs transition-opacity"
+                >
+                  {isActing ? "Finalizing…" : "Finalize Payout"}
+                </button>
+                <button
+                  onClick={() => handleVeto(payout)}
+                  disabled={ready || isVetoing || !wallet}
+                  className="flex-1 border border-red-500/60 hover:border-red-400 text-red-400 font-bold px-3 py-1.5 rounded-lg text-xs transition-colors disabled:opacity-40"
+                >
+                  {isVetoing ? "Vetoing…" : "Veto"}
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -32,15 +32,12 @@ pub fn handler(ctx: Context<ExecuteProposal>, _proposal_id: u64) -> Result<()> {
     let clock = Clock::get()?;
     let proposal = &ctx.accounts.proposal;
 
-    // Voting must have ended
+    // Must have been queued through the 48-hour timelock
+    require!(proposal.queued, MyrmexError::ProposalNotQueued);
+    // Timelock must have expired
     require!(
-        clock.unix_timestamp >= proposal.voting_ends_at,
-        MyrmexError::ProposalNotPassed
-    );
-    // Must have majority
-    require!(
-        proposal.votes_for > proposal.votes_against,
-        MyrmexError::ProposalNotPassed
+        clock.unix_timestamp >= proposal.effective_at,
+        MyrmexError::TimelockNotExpired
     );
 
     let payload = proposal.action_payload;

@@ -23,6 +23,8 @@ interface Proposal {
   voting_ends_at: number;
   executed: boolean;
   status: "active" | "passed" | "rejected" | "executed";
+  queued?: boolean;
+  effective_at?: number;
 }
 
 function timeLeft(endsAt: number): string {
@@ -63,6 +65,7 @@ export default function GovernancePage() {
   const [votes, setVotes] = useState<Record<number, "for" | "against">>({});
   const [checkingVotes, setCheckingVotes] = useState(false);
   const [voting, setVoting] = useState<number | null>(null);
+  const [queuing, setQueuing] = useState<number | null>(null);
 
   // Stake panel
   const [stakeAmount, setStakeAmount] = useState(100);
@@ -124,6 +127,43 @@ export default function GovernancePage() {
     [wallet, program]
   );
 
+  // Enrich passed proposals with on-chain queued/effective_at data
+  const enrichPassedProposals = useCallback(
+    async (proposalList: Proposal[]) => {
+      if (!program) return;
+      const passed = proposalList.filter((p) => p.status === "passed");
+      if (passed.length === 0) return;
+      await Promise.allSettled(
+        passed.map(async (p) => {
+          const proposalId = new anchor.BN(p.id);
+          const [proposalPda] = PublicKey.findProgramAddressSync(
+            [Buffer.from("proposal"), proposalId.toArrayLike(Buffer, "le", 8)],
+            PROGRAM_ID
+          );
+          try {
+            const acc = await (program as any).account.governanceProposal.fetch(
+              proposalPda
+            );
+            setProposals((prev) =>
+              prev.map((q) =>
+                q.id === p.id
+                  ? {
+                      ...q,
+                      queued: acc.queued as boolean,
+                      effective_at: Number(acc.effectiveAt ?? acc.effective_at),
+                    }
+                  : q
+              )
+            );
+          } catch {
+            /* not found = treat as unqueued */
+          }
+        })
+      );
+    },
+    [program]
+  );
+
   useEffect(() => {
     fetchProposals();
   }, [fetchProposals]);
@@ -132,6 +172,49 @@ export default function GovernancePage() {
   useEffect(() => {
     if (proposals.length > 0) checkVoteRecords(proposals);
   }, [proposals, wallet, checkVoteRecords]);
+
+  useEffect(() => {
+    if (proposals.length > 0) enrichPassedProposals(proposals);
+  }, [proposals, enrichPassedProposals]);
+
+  const handleQueueProposal = async (proposal: Proposal) => {
+    if (!program || !wallet) {
+      toast.error("Connect wallet first");
+      return;
+    }
+    setQueuing(proposal.id);
+    try {
+      const proposalId = new anchor.BN(proposal.id);
+      const [proposalPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("proposal"), proposalId.toArrayLike(Buffer, "le", 8)],
+        PROGRAM_ID
+      );
+      await (program as any).methods
+        .queueProposal(proposalId)
+        .accounts({
+          caller: wallet.publicKey,
+          proposal: proposalPda,
+        })
+        .rpc();
+      toast.success(`Proposal #${proposal.id} queued — executable in 48 hours`);
+      // Re-enrich to update UI
+      setTimeout(() => enrichPassedProposals(proposals), 2000);
+    } catch (e: unknown) {
+      const msg = (e as Error).message ?? "";
+      if (msg.includes("ProposalNotPassed")) {
+        toast.error("Proposal has not passed yet");
+      } else if (msg.includes("already in use") || msg.includes("0x0")) {
+        toast.info("Proposal is already queued for execution");
+        setProposals((prev) =>
+          prev.map((q) => (q.id === proposal.id ? { ...q, queued: true } : q))
+        );
+      } else {
+        toast.error("Queue failed", { description: msg });
+      }
+    } finally {
+      setQueuing(null);
+    }
+  };
 
   const handleStake = async () => {
     if (!program || !wallet) {
@@ -531,6 +614,42 @@ export default function GovernancePage() {
                         ? "✗ Voted Against"
                         : "Vote Against"}
                     </button>
+                  </div>
+                )}
+
+                {p.status === "passed" && !p.executed && (
+                  <div className="pt-1">
+                    {p.queued ? (
+                      <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-3 space-y-1">
+                        <div className="text-xs font-semibold text-blue-400">
+                          ⏱ Queued — 48-hour timelock in progress
+                        </div>
+                        {p.effective_at && (
+                          <div className="text-xs text-gray-500">
+                            Executable after{" "}
+                            {new Date(p.effective_at * 1000).toLocaleString()} ·{" "}
+                            {timeLeft(p.effective_at)}
+                          </div>
+                        )}
+                        <div className="text-xs text-gray-600">
+                          Visit the{" "}
+                          <a href="/admin" className="text-[var(--accent)] underline">
+                            Governance Dashboard
+                          </a>{" "}
+                          to execute after the delay expires.
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleQueueProposal(p)}
+                        disabled={queuing === p.id || !wallet}
+                        className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold px-4 py-2 rounded-lg text-sm transition-colors"
+                      >
+                        {queuing === p.id
+                          ? "Queuing…"
+                          : "Queue for Execution (starts 48h timelock)"}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

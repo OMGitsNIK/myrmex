@@ -61,6 +61,9 @@ pub fn handler(ctx: Context<InitializePool>, pool_type: u8, pool_name: [u8; 32])
     pool.active_policy_count = 0;
     pool.is_active = true;
     pool.bump = ctx.bumps.pool;
+    pool.junior_liquidity = 0;
+    pool.mezzanine_liquidity = 0;
+    pool.senior_liquidity = 0;
 
     Ok(())
 }

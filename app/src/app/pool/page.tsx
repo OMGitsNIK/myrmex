@@ -153,6 +153,8 @@ export default function PoolPage() {
   const [withdrawing, setWithdrawing] = useState<string | null>(null);
   const [successes, setSuccesses] = useState<PoolActionSuccess[]>([]);
   const [lpBalances, setLpBalances] = useState<Record<string, number>>({});
+  const [selectedTranches, setSelectedTranches] = useState<Record<string, number>>({});
+  const [trancheData, setTrancheData] = useState<Record<string, { junior: number; mezzanine: number; senior: number }>>({});
 
   const refreshLpBalance = useCallback(
     async (poolPubkey: string, lpMint: PublicKey) => {
@@ -174,14 +176,22 @@ export default function PoolPage() {
   );
 
   useEffect(() => {
-    if (!program || !wallet || pools.length === 0) return;
+    if (!program || pools.length === 0) return;
     pools.forEach(async (p: PoolData) => {
       try {
         const poolAccount = (await (program as any).account.riskPool.fetch(
           new PublicKey(p.pubkey)
         )) as any;
         const lpMint = poolAccount.lpTokenMint as PublicKey;
-        refreshLpBalance(p.pubkey, lpMint);
+        if (wallet) refreshLpBalance(p.pubkey, lpMint);
+        setTrancheData((prev) => ({
+          ...prev,
+          [p.pubkey]: {
+            junior: Number(poolAccount.juniorLiquidity ?? poolAccount.junior_liquidity ?? 0),
+            mezzanine: Number(poolAccount.mezzanineLiquidity ?? poolAccount.mezzanine_liquidity ?? 0),
+            senior: Number(poolAccount.seniorLiquidity ?? poolAccount.senior_liquidity ?? 0),
+          },
+        }));
       } catch {
         /* ignore */
       }
@@ -236,17 +246,31 @@ export default function PoolPage() {
       setupTx.feePayer = wallet.publicKey;
       await (program.provider as any).sendAndConfirm(setupTx);
 
-      const tx = await program.methods
-        .fundPool(new anchor.BN(Math.floor(amount * USDC_DECIMALS)))
-        .accounts({
-          provider: wallet.publicKey,
-          pool: poolPk,
-          providerUsdc,
-          poolVault,
-          lpTokenMint: lpMint,
-          providerLpTokens,
-        })
-        .rpc();
+      const tranche = selectedTranches[poolPubkey] ?? -1;
+      const tx =
+        tranche >= 0
+          ? await (program as any).methods
+              .fundTranche(new anchor.BN(Math.floor(amount * USDC_DECIMALS)), tranche)
+              .accounts({
+                provider: wallet.publicKey,
+                pool: poolPk,
+                providerUsdc,
+                poolVault,
+                lpTokenMint: lpMint,
+                providerLpTokens,
+              })
+              .rpc()
+          : await program.methods
+              .fundPool(new anchor.BN(Math.floor(amount * USDC_DECIMALS)))
+              .accounts({
+                provider: wallet.publicKey,
+                pool: poolPk,
+                providerUsdc,
+                poolVault,
+                lpTokenMint: lpMint,
+                providerLpTokens,
+              })
+              .rpc();
 
       setSuccesses((prev) => [
         {
@@ -572,6 +596,55 @@ export default function PoolPage() {
                       width: `${Math.min(Number(p.utilizationPct), 100)}%`,
                     }}
                   />
+                </div>
+              </div>
+
+              {/* Tranche breakdown */}
+              {trancheData[poolKey] && (() => {
+                const td = trancheData[poolKey];
+                const trancheTotal = td.junior + td.mezzanine + td.senior;
+                const juniorPct = trancheTotal > 0 ? (td.junior / trancheTotal) * 100 : 0;
+                const mezPct = trancheTotal > 0 ? (td.mezzanine / trancheTotal) * 100 : 0;
+                const seniorPct = trancheTotal > 0 ? (td.senior / trancheTotal) * 100 : 0;
+                return (
+                  <div className="space-y-1.5">
+                    <div className="text-xs text-gray-500 font-medium">Tranche Breakdown</div>
+                    <div className="h-2 bg-[var(--surface-2)] rounded-full overflow-hidden flex gap-0.5">
+                      <div className="h-full bg-red-400/70 rounded-l transition-all" style={{ width: `${juniorPct}%` }} title={`Junior: $${(td.junior / USDC_DECIMALS).toFixed(0)}`} />
+                      <div className="h-full bg-yellow-400/70 transition-all" style={{ width: `${mezPct}%` }} title={`Mezzanine: $${(td.mezzanine / USDC_DECIMALS).toFixed(0)}`} />
+                      <div className="h-full bg-[var(--accent)]/70 rounded-r transition-all" style={{ width: `${seniorPct}%` }} title={`Senior: $${(td.senior / USDC_DECIMALS).toFixed(0)}`} />
+                    </div>
+                    <div className="flex gap-4 text-xs text-gray-500">
+                      <span><span className="text-red-400">■</span> Junior ${(td.junior / USDC_DECIMALS).toLocaleString()}</span>
+                      <span><span className="text-yellow-400">■</span> Mez ${(td.mezzanine / USDC_DECIMALS).toLocaleString()}</span>
+                      <span><span className="text-[var(--accent)]">■</span> Senior ${(td.senior / USDC_DECIMALS).toLocaleString()}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Tranche selector */}
+              <div className="space-y-1">
+                <div className="text-xs text-gray-500">Deposit tranche (optional — default: general pool)</div>
+                <div className="flex gap-2">
+                  {[
+                    { label: "General", value: -1 },
+                    { label: "Junior", value: 0 },
+                    { label: "Mezzanine", value: 1 },
+                    { label: "Senior", value: 2 },
+                  ].map(({ label, value }) => (
+                    <button
+                      key={value}
+                      onClick={() => setSelectedTranches((prev) => ({ ...prev, [poolKey]: value }))}
+                      className={`text-xs px-2 py-1 rounded border transition-colors ${
+                        (selectedTranches[poolKey] ?? -1) === value
+                          ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent-dim)]"
+                          : "border-[var(--border)] text-gray-500 hover:border-gray-400"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
               </div>
 

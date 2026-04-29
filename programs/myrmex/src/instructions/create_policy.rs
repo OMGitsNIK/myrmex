@@ -6,6 +6,8 @@ use crate::errors::MyrmexError;
 use crate::events::PolicyCreated;
 use crate::state::{PolicyVault, PoolConfig, RiskPool, TriggerCondition};
 
+const RESERVE_BPS: u64 = 500; // 5% of premium to reserve
+
 #[derive(Accounts)]
 #[instruction(
     coverage_type: u8,
@@ -31,19 +33,20 @@ pub struct CreatePolicy<'info> {
         ],
         bump
     )]
-    pub policy: Account<'info, PolicyVault>,
+    pub policy: Box<Account<'info, PolicyVault>>,
 
     #[account(
         mut,
         constraint = pool.is_active @ MyrmexError::PoolNotActive,
         constraint = pool.available_liquidity() >= payout_amount @ MyrmexError::InsufficientLiquidity,
     )]
-    pub pool: Account<'info, RiskPool>,
+    pub pool: Box<Account<'info, RiskPool>>,
 
     #[account(
+        mut,
         constraint = pool_config.pool == pool.key() @ MyrmexError::Unauthorized,
     )]
-    pub pool_config: Account<'info, PoolConfig>,
+    pub pool_config: Box<Account<'info, PoolConfig>>,
 
     #[account(
         mut,
@@ -60,6 +63,17 @@ pub struct CreatePolicy<'info> {
 
     #[account(address = pool.usdc_mint @ MyrmexError::Unauthorized)]
     pub usdc_mint: Account<'info, Mint>,
+
+    /// Optional reserve vault — if present, 5% of premium is routed there as backstop.
+    /// Initialize via `initialize_reserve` before calling this instruction.
+    #[account(
+        mut,
+        seeds = [b"reserve_vault", pool.key().as_ref()],
+        bump,
+        token::mint = usdc_mint,
+        token::authority = pool,
+    )]
+    pub reserve_vault: Option<Account<'info, TokenAccount>>,
 
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
@@ -131,16 +145,53 @@ pub fn handler(
         .ok_or(error!(MyrmexError::MathOverflow))?;
     require!(new_locked <= max_locked, MyrmexError::CoverageCapExceeded);
 
-    // Transfer premium USDC from policyholder to pool vault
-    let transfer_cpi = Transfer {
-        from: ctx.accounts.policyholder_usdc.to_account_info(),
-        to: ctx.accounts.pool_vault.to_account_info(),
-        authority: ctx.accounts.policyholder.to_account_info(),
+    // Split premium: 5% to reserve vault (if initialized), 95% to pool vault
+    let (reserve_cut, pool_cut) = if ctx.accounts.reserve_vault.is_some() {
+        let cut = premium_amount
+            .checked_mul(RESERVE_BPS)
+            .ok_or(error!(MyrmexError::MathOverflow))?
+            .checked_div(10_000)
+            .ok_or(error!(MyrmexError::MathOverflow))?;
+        let rest = premium_amount
+            .checked_sub(cut)
+            .ok_or(error!(MyrmexError::MathOverflow))?;
+        (cut, rest)
+    } else {
+        (0u64, premium_amount)
     };
+
+    // Transfer pool cut to pool vault
     token::transfer(
-        CpiContext::new(ctx.accounts.token_program.to_account_info(), transfer_cpi),
-        premium_amount,
+        CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            Transfer {
+                from: ctx.accounts.policyholder_usdc.to_account_info(),
+                to: ctx.accounts.pool_vault.to_account_info(),
+                authority: ctx.accounts.policyholder.to_account_info(),
+            },
+        ),
+        pool_cut,
     )?;
+
+    // Transfer reserve cut (if vault present)
+    if reserve_cut > 0 {
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.policyholder_usdc.to_account_info(),
+                    to: ctx
+                        .accounts
+                        .reserve_vault
+                        .as_ref()
+                        .unwrap()
+                        .to_account_info(),
+                    authority: ctx.accounts.policyholder.to_account_info(),
+                },
+            ),
+            reserve_cut,
+        )?;
+    }
 
     // Initialize policy vault
     let policy = &mut ctx.accounts.policy;
@@ -163,10 +214,10 @@ pub fn handler(
         .total_locked
         .checked_add(payout_amount)
         .ok_or(error!(MyrmexError::MathOverflow))?;
-    // Premium is earned yield — add to total_liquidity so all LPs share it pro-rata.
+    // Only pool_cut goes to total_liquidity (reserve_cut is held separately in reserve_vault)
     pool.total_liquidity = pool
         .total_liquidity
-        .checked_add(premium_amount)
+        .checked_add(pool_cut)
         .ok_or(error!(MyrmexError::MathOverflow))?;
     pool.premium_accrued = pool
         .premium_accrued
@@ -176,6 +227,16 @@ pub fn handler(
         .active_policy_count
         .checked_add(1)
         .ok_or(error!(MyrmexError::MathOverflow))?;
+
+    // Track reserve contribution in pool_config
+    if reserve_cut > 0 {
+        ctx.accounts.pool_config.reserve_balance = ctx
+            .accounts
+            .pool_config
+            .reserve_balance
+            .checked_add(reserve_cut)
+            .ok_or(error!(MyrmexError::MathOverflow))?;
+    }
 
     emit!(PolicyCreated {
         policy: ctx.accounts.policy.key(),
