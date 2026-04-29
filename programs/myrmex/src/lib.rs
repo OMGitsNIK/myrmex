@@ -129,4 +129,8 @@ pub mod myrmex {
     pub fn cast_vote(ctx: Context<CastVote>, proposal_id: u64, vote: bool) -> Result<()> {
         instructions::cast_vote::handler(ctx, proposal_id, vote)
     }
+
+    pub fn close_policy(ctx: Context<ClosePolicy>, nonce: i64) -> Result<()> {
+        instructions::close_policy::handler(ctx, nonce)
+    }
 }
