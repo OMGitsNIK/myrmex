@@ -298,7 +298,14 @@ export default function AdminPage() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
               <MiniMetric
                 label="Payouts Executed"
-                value={`${stats?.payouts_executed ?? 0}`}
+                value={`${stats?.total_payouts_executed ?? 0}`}
+                loading={loading}
+              />
+              <MiniMetric
+                label="Total Premium Accrued"
+                value={`$${(
+                  (stats?.total_premium_accrued ?? 0) / 1_000_000
+                ).toFixed(2)}`}
                 loading={loading}
               />
               <MiniMetric
