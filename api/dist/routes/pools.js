@@ -56,7 +56,8 @@ router.get("/", async (_req, res) => {
                 };
             }
             catch {
-                // pool_config not yet initialized
+                // pool_config not yet initialized — skip unconfigured pools
+                return null;
             }
             return {
                 pubkey: publicKey.toBase58(),
@@ -79,7 +80,7 @@ router.get("/", async (_req, res) => {
                 poolConfig,
             };
         }));
-        res.json(result);
+        res.json(result.filter((p) => p !== null));
     }
     catch (e) {
         res.status(500).json({ error: e.message });

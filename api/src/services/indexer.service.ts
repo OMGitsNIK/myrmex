@@ -1,61 +1,96 @@
-import { PublicKey } from "@solana/web3.js";
 import { getAnchorProgram } from "./anchor.service";
 import db from "../db/schema";
 
 export function startIndexer() {
   try {
-    const { provider } = getAnchorProgram();
-    const connection = provider.connection;
-    const programId = new PublicKey(
-      process.env.PROGRAM_ID || "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan"
+    const { program } = getAnchorProgram();
+
+    program.addEventListener(
+      "PolicyCreated",
+      (event: any, _slot, signature) => {
+        try {
+          db.prepare(
+            "INSERT OR IGNORE INTO events (event_type, tx_signature, data) VALUES (?, ?, ?)"
+          ).run(
+            "PolicyCreated",
+            signature,
+            JSON.stringify({
+              policy: event.policy.toBase58(),
+              policyholder: event.policyholder.toBase58(),
+              pool: event.pool.toBase58(),
+              coverage_type: event.coverageType,
+              payout_amount: event.payoutAmount.toString(),
+              premium_amount: event.premiumAmount.toString(),
+              expires_at: event.expiresAt.toString(),
+            })
+          );
+        } catch (err) {
+          console.error("[indexer] PolicyCreated insert failed:", err);
+        }
+      }
     );
 
-    connection.onLogs(programId, (logs) => {
-      if (logs.err) return;
-      logs.logs.forEach((log) => {
-        if (log.includes("PolicyCreated")) {
+    program.addEventListener(
+      "PayoutExecuted",
+      (event: any, _slot, signature) => {
+        try {
           db.prepare(
             "INSERT OR IGNORE INTO events (event_type, tx_signature, data) VALUES (?, ?, ?)"
-          ).run("PolicyCreated", logs.signature, log);
+          ).run(
+            "PayoutExecuted",
+            signature,
+            JSON.stringify({
+              policy: event.policy.toBase58(),
+              policyholder: event.policyholder.toBase58(),
+              payout_amount: event.payoutAmount.toString(),
+              oracle_value: event.oracleValue.toString(),
+              timestamp: event.timestamp.toString(),
+            })
+          );
+        } catch (err) {
+          console.error("[indexer] PayoutExecuted insert failed:", err);
         }
-        if (log.includes("PayoutExecuted")) {
-          db.prepare(
-            "INSERT OR IGNORE INTO events (event_type, tx_signature, data) VALUES (?, ?, ?)"
-          ).run("PayoutExecuted", logs.signature, log);
-        }
-        if (log.includes("PoolFunded")) {
-          db.prepare(
-            "INSERT OR IGNORE INTO events (event_type, tx_signature, data) VALUES (?, ?, ?)"
-          ).run("PoolFunded", logs.signature, log);
-        }
-      });
-    });
+      }
+    );
 
-    console.log("Event indexer started, listening to:", programId.toBase58());
+    console.log(
+      "[indexer] Structured event listener started for:",
+      program.programId.toBase58()
+    );
   } catch (e) {
-    console.error("Indexer failed to start:", e);
+    console.error("[indexer] Failed to start:", e);
   }
 }
 
 export function getStats() {
-  const total = (db.prepare("SELECT COUNT(*) as n FROM events").get() as any).n;
-  const payouts = (
-    db
-      .prepare(
-        "SELECT COUNT(*) as n FROM events WHERE event_type = 'PayoutExecuted'"
-      )
-      .get() as any
-  ).n;
-  const policies = (
-    db
-      .prepare(
-        "SELECT COUNT(*) as n FROM events WHERE event_type = 'PolicyCreated'"
-      )
-      .get() as any
-  ).n;
+  const events = db
+    .prepare("SELECT event_type, data FROM events")
+    .all() as any[];
+
+  let totalPremium = 0;
+  let totalPayouts = 0;
+  let policiesCreated = 0;
+
+  for (const e of events) {
+    try {
+      const data = JSON.parse(e.data);
+      if (e.event_type === "PolicyCreated") {
+        totalPremium += parseInt(data.premium_amount || "0", 10);
+        policiesCreated++;
+      }
+      if (e.event_type === "PayoutExecuted") {
+        totalPayouts += parseInt(data.payout_amount || "0", 10);
+      }
+    } catch {
+      // ignore malformed rows
+    }
+  }
+
   return {
-    total_events: total,
-    payouts_executed: payouts,
-    policies_created: policies,
+    total_events: events.length,
+    policies_created: policiesCreated,
+    total_premium_accrued: totalPremium,
+    total_payouts_executed: totalPayouts,
+    last_sync_time: new Date().toISOString(),
   };
 }

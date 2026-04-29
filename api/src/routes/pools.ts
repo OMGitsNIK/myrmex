@@ -70,7 +70,8 @@ router.get("/", async (_req, res) => {
             maxCoverageBps: cfg.maxCoverageBps.toNumber(),
           };
         } catch {
-          // pool_config not yet initialized
+          // pool_config not yet initialized — skip unconfigured pools
+          return null;
         }
 
         return {
@@ -97,7 +98,7 @@ router.get("/", async (_req, res) => {
       })
     );
 
-    res.json(result);
+    res.json(result.filter((p) => p !== null));
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }

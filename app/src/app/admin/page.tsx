@@ -10,8 +10,10 @@ interface StatsResponse {
   total_tvl_usdc: number;
   active_policies: number;
   total_pools: number;
-  payouts_executed?: number;
+  total_premium_accrued?: number;
+  total_payouts_executed?: number;
   total_events?: number;
+  last_sync_time?: string;
 }
 
 interface PoolResponse {
