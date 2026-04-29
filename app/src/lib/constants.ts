@@ -308,12 +308,24 @@ export const COVERAGE_TYPES = [
 ] as const;
 
 // ── On-chain pool pubkeys ─────────────────────────────────────────────────
-// type → pool pubkey on devnet
+// Populated from env vars; devnet addresses are the fallback defaults.
 export const POOL_BY_TYPE: Record<number, string> = {
-  0: "EHxPZAMvRhumjFeChfeD9bn2Ju1RWf7RM45pY5vzEhNH", // Earthquake
-  1: "HfyGsQVVsxt6BNM7UzTepBo91DKYdqLy7RKuLrwnM1YY", // Flood
-  2: "HuPG3dmBftRCAwg71tro7pmp2hjoCT8KWaNtytwUqUo2", // Crop MultiF
-  3: "ZZWgmeRUSdQyuarSb2zPFron2x88UgexhTQn8hJr9uD", // Hurricane
-  4: "CcGbU74HpT8sjDU5NDDWFzBPYEARBEfAac4ovDWwgxWU", // Stablecoin Depeg
-  5: "AqKUYemw3A6GbYFnCFwE9S1f1QCfhH4EAjFQCDxyfUtQ", // Bridge Hack
+  0:
+    process.env.NEXT_PUBLIC_POOL_TYPE_0 ||
+    "EHxPZAMvRhumjFeChfeD9bn2Ju1RWf7RM45pY5vzEhNH",
+  1:
+    process.env.NEXT_PUBLIC_POOL_TYPE_1 ||
+    "HfyGsQVVsxt6BNM7UzTepBo91DKYdqLy7RKuLrwnM1YY",
+  2:
+    process.env.NEXT_PUBLIC_POOL_TYPE_2 ||
+    "HuPG3dmBftRCAwg71tro7pmp2hjoCT8KWaNtytwUqUo2",
+  3:
+    process.env.NEXT_PUBLIC_POOL_TYPE_3 ||
+    "ZZWgmeRUSdQyuarSb2zPFron2x88UgexhTQn8hJr9uD",
+  4:
+    process.env.NEXT_PUBLIC_POOL_TYPE_4 ||
+    "CcGbU74HpT8sjDU5NDDWFzBPYEARBEfAac4ovDWwgxWU",
+  5:
+    process.env.NEXT_PUBLIC_POOL_TYPE_5 ||
+    "AqKUYemw3A6GbYFnCFwE9S1f1QCfhH4EAjFQCDxyfUtQ",
 };

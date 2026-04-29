@@ -3,6 +3,7 @@ use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
 use crate::errors::MyrmexError;
+use crate::events::MyrUnstaked;
 use crate::state::StakeAccount;
 
 #[derive(Accounts)]
@@ -80,6 +81,12 @@ pub fn handler(ctx: Context<UnstakeMyr>, amount: u64) -> Result<()> {
         ),
         amount,
     )?;
+
+    emit!(MyrUnstaked {
+        owner: ctx.accounts.owner.key(),
+        amount,
+        remaining_staked: ctx.accounts.stake_account.amount_staked,
+    });
 
     Ok(())
 }

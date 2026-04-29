@@ -42,3 +42,18 @@ pub struct LpWithdrawn {
     pub usdc_returned: u64,
     pub lp_tokens_burned: u64,
 }
+
+#[event]
+pub struct MyrStaked {
+    pub owner: Pubkey,
+    pub amount: u64,
+    pub total_staked: u64,
+    pub lock_until: i64,
+}
+
+#[event]
+pub struct MyrUnstaked {
+    pub owner: Pubkey,
+    pub amount: u64,
+    pub remaining_staked: u64,
+}
