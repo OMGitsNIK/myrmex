@@ -36,6 +36,8 @@ router.get("/", async (_req, res) => {
           created_at: d.createdAt.toNumber(),
           voting_ends_at: endsAt,
           executed: d.executed,
+          queued: d.queued ?? false,
+          effective_at: d.effectiveAt?.toNumber() ?? 0,
           status,
         };
       })

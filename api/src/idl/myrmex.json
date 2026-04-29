@@ -2446,6 +2446,36 @@
       ]
     },
     {
+      "name": "toggle_pool_active",
+      "discriminator": [
+        89,
+        212,
+        54,
+        246,
+        15,
+        145,
+        111,
+        149
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "active",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "trigger_payout",
       "discriminator": [
         145,
@@ -3839,6 +3869,11 @@
       "code": 6029,
       "name": "InsufficientTrancheLiquidity",
       "msg": "Insufficient tranche liquidity for withdrawal"
+    },
+    {
+      "code": 6030,
+      "name": "DemoModeDisabled",
+      "msg": "Instant payout is disabled — use queue_payout for the 48-hour verified flow"
     }
   ],
   "types": [
@@ -4330,6 +4365,14 @@
               "Running total of USDC held in the reserve vault (informational; canonical source is the vault balance)"
             ],
             "type": "u64"
+          },
+          {
+            "name": "demo_mode",
+            "docs": [
+              "When true, trigger_payout (instant, no delay) is permitted — for demo/testnet use only.",
+              "Production pools should set this to false; real claims go through queue_payout → finalize_payout."
+            ],
+            "type": "bool"
           }
         ]
       }

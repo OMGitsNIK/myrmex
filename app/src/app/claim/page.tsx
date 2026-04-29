@@ -12,7 +12,6 @@ import {
   USDC_DECIMALS,
 } from "@/lib/constants";
 import * as anchor from "@coral-xyz/anchor";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { toast } from "sonner";
 
@@ -101,6 +100,8 @@ export default function ClaimPage() {
     return () => clearTimeout(timer);
   }, [policyPubkey]);
 
+  const [queuedAt, setQueuedAt] = useState<number | null>(null);
+
   const handleClaim = async () => {
     if (!program || !wallet || !policyInfo) {
       toast.error("Connect wallet and load a policy first");
@@ -134,45 +135,35 @@ export default function ClaimPage() {
         ],
         PROGRAM_ID
       );
-
-      // Fetch pool to get vault + usdcMint
-      const poolsRes = await fetch(`${API_URL}/api/pools`);
-      const pools = (await poolsRes.json()) as any[];
-      const pool = pools.find((p: any) => p.pubkey === policyInfo.pool);
-      if (!pool) throw new Error("Pool not found");
-
-      const usdcMint = new PublicKey(
-        process.env.NEXT_PUBLIC_USDC_MINT || pool.usdcMint || ""
-      );
-      const policyholderUsdc = getAssociatedTokenAddressSync(
-        usdcMint,
-        wallet.publicKey
+      const [pendingPayoutPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("pending_payout"), policyPk.toBuffer()],
+        PROGRAM_ID
       );
 
+      // Queue payout — USDC does not move yet; a 48-hour verification delay starts.
+      // After the delay, anyone can call finalize_payout from the Governance Dashboard.
       const tx = await (program as any).methods
-        .triggerPayout()
+        .queuePayout()
         .accounts({
           caller: wallet.publicKey,
           policy: policyPk,
           pool: poolPk,
           poolConfig: poolConfigPda,
           oracleReport: oracleReportPda,
-          policyholderUsdc,
-          poolVault: new PublicKey(pool.vault),
           policyholder: wallet.publicKey,
-          tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
+          pendingPayout: pendingPayoutPda,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
         .rpc();
 
       setClaimTx(tx);
-      toast.success("Payout claimed successfully!");
+      setQueuedAt(Math.floor(Date.now() / 1000));
+      toast.success("Claim queued — payout releases after 48-hour verification");
       setPolicyInfo((prev) =>
         prev ? { ...prev, isClaimed: true, isActive: false } : prev
       );
     } catch (e: unknown) {
       const err = e as Error;
-      // Parse on-chain error for better UX
       if (err.message.includes("TriggerNotMet")) {
         toast.error("Trigger condition not met", {
           description:
@@ -183,6 +174,9 @@ export default function ClaimPage() {
           description:
             "No fresh oracle data found. The oracle service posts reports every 5 minutes.",
         });
+      } else if (err.message.includes("already in use") || err.message.includes("0x0")) {
+        toast.info("Claim already queued — check the Governance Dashboard for payout status");
+        setClaimTx("already-queued");
       } else {
         toast.error("Claim failed", { description: err.message });
       }
@@ -209,8 +203,8 @@ export default function ClaimPage() {
           Claim Payout
         </h1>
         <p className="text-gray-400 mt-2">
-          If your trigger condition is met, call the smart contract to receive
-          your payout instantly.
+          If your trigger condition is met, queue a claim. USDC is released
+          after a 48-hour verification window to prevent oracle manipulation.
         </p>
       </div>
 
@@ -218,21 +212,23 @@ export default function ClaimPage() {
       <div className="card p-5 space-y-2 text-sm text-gray-400">
         <p className="text-white font-semibold text-sm">How claims work</p>
         <p>
-          The oracle service monitors real-world events and posts signed data to
-          the blockchain. When conditions are met, anyone can trigger the payout
-          — USDC always goes to the policyholder.
+          The oracle service monitors real-world events and posts signed data on-chain.
+          When your trigger condition is met, submitting a claim queues a payout with a
+          48-hour verification window — protecting against oracle manipulation before
+          USDC is released.
         </p>
-        <div className="flex gap-6 pt-1 text-xs">
+        <div className="flex gap-6 pt-1 text-xs flex-wrap">
           <span>
-            <span className="text-[var(--accent)]">1.</span> Oracle posts data
-            on-chain
+            <span className="text-[var(--accent)]">1.</span> Oracle posts data on-chain
           </span>
           <span>
-            <span className="text-[var(--accent)]">2.</span> Smart contract
-            verifies condition
+            <span className="text-[var(--accent)]">2.</span> You queue the claim here
           </span>
           <span>
-            <span className="text-[var(--accent)]">3.</span> USDC sent instantly
+            <span className="text-[var(--accent)]">3.</span> 48h verification window
+          </span>
+          <span>
+            <span className="text-[var(--accent)]">4.</span> USDC released automatically
           </span>
         </div>
       </div>
@@ -361,7 +357,7 @@ export default function ClaimPage() {
           className="w-full bg-[var(--accent)] hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-black font-bold py-3.5 rounded-lg transition-opacity text-sm tracking-wide shadow-[0_0_20px_rgba(0,255,135,0.2)]"
         >
           {submitting
-            ? "Submitting claim..."
+            ? "Queuing claim..."
             : policyInfo.isClaimed
             ? "Already Claimed"
             : !policyInfo.isActive
@@ -370,30 +366,60 @@ export default function ClaimPage() {
             ? "Connect Wallet"
             : wallet.publicKey.toBase58() !== policyInfo.policyholder
             ? "Not Your Policy"
-            : `Claim $${policyInfo.payoutAmount.toLocaleString()} USDC`}
+            : `Queue Claim — $${policyInfo.payoutAmount.toLocaleString()} USDC`}
         </button>
       )}
 
-      {/* Success */}
-      {claimTx && (
-        <div className="card p-6 border-[var(--accent)]/30 space-y-3">
+      {/* Success — queued */}
+      {claimTx && claimTx !== "already-queued" && (
+        <div className="card p-6 border-blue-400/30 space-y-3">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-[var(--accent)]" />
-            <span className="text-[var(--accent)] font-semibold text-sm">
-              Payout Received
+            <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+            <span className="text-blue-400 font-semibold text-sm">
+              Claim Queued — 48-Hour Verification Starts Now
             </span>
           </div>
           <p className="text-sm text-gray-400">
-            USDC has been transferred to your wallet.
+            Your payout of{" "}
+            <span className="text-white font-medium">
+              ${policyInfo?.payoutAmount.toLocaleString()} USDC
+            </span>{" "}
+            is locked and waiting. After the 48-hour window, it can be finalized
+            from the{" "}
+            <a href="/admin" className="text-[var(--accent)] underline">
+              Governance Dashboard
+            </a>
+            . This delay protects against oracle manipulation.
           </p>
+          {queuedAt && (
+            <div className="text-xs text-gray-500">
+              Finalization available after:{" "}
+              <span className="text-white">
+                {new Date((queuedAt + 172800) * 1000).toLocaleString()}
+              </span>
+            </div>
+          )}
           <a
             href={explorerUrl(claimTx)}
             target="_blank"
             rel="noopener noreferrer"
-            className="block text-center text-sm border border-[var(--accent)]/40 text-[var(--accent)] px-4 py-2 rounded-lg hover:border-[var(--accent)] transition-colors"
+            className="block text-center text-sm border border-blue-400/40 text-blue-400 px-4 py-2 rounded-lg hover:border-blue-400 transition-colors"
           >
             View Transaction →
           </a>
+        </div>
+      )}
+
+      {claimTx === "already-queued" && (
+        <div className="card p-6 border-yellow-500/30 space-y-2">
+          <p className="text-yellow-400 font-semibold text-sm">Already In Queue</p>
+          <p className="text-sm text-gray-400">
+            This claim is already queued. Visit the{" "}
+            <a href="/admin" className="text-[var(--accent)] underline">
+              Governance Dashboard
+            </a>{" "}
+            to check its status and finalize when the delay expires.
+          </p>
         </div>
       )}
     </div>

@@ -62,4 +62,6 @@ pub enum MyrmexError {
     InvalidTranche,
     #[msg("Insufficient tranche liquidity for withdrawal")]
     InsufficientTrancheLiquidity,
+    #[msg("Instant payout is disabled — use queue_payout for the 48-hour verified flow")]
+    DemoModeDisabled,
 }

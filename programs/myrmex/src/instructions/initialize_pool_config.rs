@@ -48,6 +48,7 @@ pub fn handler(
     config.max_coverage_bps = max_coverage_bps;
     config.bump = ctx.bumps.pool_config;
     config.reserve_balance = 0;
+    config.demo_mode = true; // enabled by default; disable on mainnet via update_pool_config
 
     Ok(())
 }

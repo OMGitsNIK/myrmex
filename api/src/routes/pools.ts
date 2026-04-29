@@ -59,15 +59,19 @@ router.get("/", async (_req, res) => {
           PROGRAM_ID
         );
         let poolConfig: Record<string, any> | null = null;
+        let reserveBalance = 0;
         try {
           const cfg = await (program as any).account.poolConfig.fetch(
             poolConfigPda
           );
+          reserveBalance = cfg.reserveBalance?.toNumber() ?? 0;
           poolConfig = {
             pubkey: poolConfigPda.toBase58(),
             oracleAuthority: cfg.oracleAuthority.toBase58(),
             minPremiumBps: cfg.minPremiumBps.toNumber(),
             maxCoverageBps: cfg.maxCoverageBps.toNumber(),
+            reserveBalance,
+            demoMode: cfg.demoMode ?? true,
           };
         } catch {
           // pool_config not yet initialized — skip unconfigured pools
@@ -93,6 +97,10 @@ router.get("/", async (_req, res) => {
           vault: acc.vault.toBase58(),
           usdcMint: acc.usdcMint.toBase58(),
           lpTokenMint: acc.lpTokenMint.toBase58(),
+          juniorLiquidity: acc.juniorLiquidity?.toNumber() ?? 0,
+          mezzanineLiquidity: acc.mezzanineLiquidity?.toNumber() ?? 0,
+          seniorLiquidity: acc.seniorLiquidity?.toNumber() ?? 0,
+          reserveBalance,
           poolConfig,
         };
       })

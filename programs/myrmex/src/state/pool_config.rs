@@ -11,9 +11,12 @@ pub struct PoolConfig {
     pub bump: u8,
     /// Running total of USDC held in the reserve vault (informational; canonical source is the vault balance)
     pub reserve_balance: u64,
+    /// When true, trigger_payout (instant, no delay) is permitted — for demo/testnet use only.
+    /// Production pools should set this to false; real claims go through queue_payout → finalize_payout.
+    pub demo_mode: bool,
 }
 
 impl PoolConfig {
-    // 8 discriminator + 32 + 32 + 8 + 8 + 1 + 8
-    pub const LEN: usize = 97;
+    // 8 discriminator + 32 + 32 + 8 + 8 + 1 + 8 + 1
+    pub const LEN: usize = 98;
 }

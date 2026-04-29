@@ -160,6 +160,11 @@ pub mod myrmex {
         instructions::veto_payout::handler(ctx)
     }
 
+    // ── Emergency pool management ─────────────────────────────────────────
+    pub fn toggle_pool_active(ctx: Context<TogglePoolActive>, active: bool) -> Result<()> {
+        instructions::toggle_pool_active::handler(ctx, active)
+    }
+
     // ── Feature 3: Reserve fund ───────────────────────────────────────────
     pub fn initialize_reserve(ctx: Context<InitializeReserve>) -> Result<()> {
         instructions::initialize_reserve::handler(ctx)

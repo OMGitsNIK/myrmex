@@ -26,6 +26,7 @@ pub struct TriggerPayout<'info> {
 
     #[account(
         constraint = pool_config.pool == pool.key() @ MyrmexError::Unauthorized,
+        constraint = pool_config.demo_mode @ MyrmexError::DemoModeDisabled,
     )]
     pub pool_config: Account<'info, PoolConfig>,
 
