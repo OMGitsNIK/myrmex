@@ -1,10 +1,14 @@
 "use client";
 
 import { API_URL, COVERAGE_NAMES, USDC_DECIMALS } from "@/lib/constants";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAnchorProgram } from "@/hooks/useAnchorProgram";
 import { PublicKey } from "@solana/web3.js";
 import { toast } from "sonner";
+
+const PROGRAM_ID = new PublicKey(
+  "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan"
+);
 
 interface StatsResponse {
   total_tvl_usdc: number;
@@ -26,6 +30,19 @@ interface PoolResponse {
   estimatedApy: string;
   activePolicies: number;
   isActive: boolean;
+}
+
+interface ProposalAccount {
+  pubkey: string;
+  id: number;
+  proposer: string;
+  title: string;
+  votesFor: number;
+  votesAgainst: number;
+  votingEndsAt: number;
+  executed: boolean;
+  actionType: number;
+  actionPayload: number[];
 }
 
 function lamportsToUsdc(value: number) {
@@ -92,7 +109,7 @@ function CopyButton({ value }: { value: string }) {
   );
 }
 
-export default function AdminPage() {
+export default function GovernanceDashboardPage() {
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [pools, setPools] = useState<PoolResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -155,11 +172,11 @@ export default function AdminPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-white tracking-tight">
-            Protocol Admin
+            Governance Dashboard
           </h1>
           <p className="text-gray-400 mt-2">
-            Protocol metrics sourced from the API indexer. Values reflect
-            on-chain state at last poll — not a real-time ledger.
+            Protocol metrics and proposal execution. Passed proposals can be
+            executed here after voting ends.
           </p>
         </div>
         <div className="text-xs text-gray-500">
@@ -171,7 +188,7 @@ export default function AdminPage() {
 
       {error && (
         <div className="card p-4 text-sm text-red-400 border-red-500/30">
-          Failed to load admin metrics: {error}
+          Failed to load metrics: {error}
         </div>
       )}
 
@@ -324,360 +341,220 @@ export default function AdminPage() {
               reflect on-chain state at last poll.
             </p>
             <p>
-              <span className="text-yellow-400 font-medium">Pricing note:</span>{" "}
-              The actuarial quote is advisory. The on-chain floor (
-              <code className="text-[var(--accent)]">min_premium_bps</code> in{" "}
-              <code className="text-[var(--accent)]">pool_config</code>) is the
-              only enforced minimum.
+              <span className="text-yellow-400 font-medium">Note:</span> Pool
+              config changes and oracle authority updates are now managed through
+              governance proposals. Create a proposal on the{" "}
+              <a href="/governance" className="text-[var(--accent)] underline">
+                Governance
+              </a>{" "}
+              page, vote, then execute it here.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Pool Config Update Panel */}
-      <UpdatePoolConfigPanel pools={pools} />
-
-      {/* Oracle Authority Timelock Panels */}
-      <ProposeOracleAuthorityPanel pools={pools} />
-      <ApplyOracleAuthorityPanel pools={pools} />
+      {/* Proposal Execution Panel */}
+      <ExecuteProposalPanel pools={pools} />
     </div>
   );
 }
 
-function UpdatePoolConfigPanel({ pools }: { pools: PoolResponse[] }) {
-  const { program, wallet } = useAnchorProgram();
-  const PROGRAM_ID = new PublicKey(
-    "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan"
-  );
+const ACTION_TYPE_LABELS: Record<number, string> = {
+  0: "Oracle Authority Change",
+  1: "Pool Config Change",
+};
 
-  const [selectedPool, setSelectedPool] = useState("");
-  const [minPremiumBps, setMinPremiumBps] = useState("500");
-  const [maxCoverageBps, setMaxCoverageBps] = useState("8000");
-  const [submitting, setSubmitting] = useState(false);
+function decodeActionPayload(actionType: number, payload: number[]): string {
+  try {
+    const buf = Buffer.from(payload);
+    if (actionType === 0) {
+      const newOracle = new PublicKey(buf.slice(0, 32)).toBase58();
+      return `New oracle: ${newOracle.slice(0, 8)}…${newOracle.slice(-6)}`;
+    }
+    if (actionType === 1) {
+      const pool = new PublicKey(buf.slice(0, 32)).toBase58();
+      const minBps = buf.readBigUInt64LE(32);
+      const maxBps = buf.readBigUInt64LE(40);
+      return `Pool ${pool.slice(0, 8)}… min=${minBps}bps max=${maxBps}bps`;
+    }
+  } catch {
+    /* ignore */
+  }
+  return "Unknown payload";
+}
 
-  const handleUpdate = async () => {
-    if (!program || !wallet) {
-      toast.error("Connect pool authority wallet");
-      return;
-    }
-    if (!selectedPool) {
-      toast.error("Select a pool");
-      return;
-    }
-    const minBps = parseInt(minPremiumBps);
-    const maxBps = parseInt(maxCoverageBps);
-    if (!isFinite(minBps) || minBps < 0 || minBps > 10000) {
-      toast.error("min_premium_bps must be 0–10000");
-      return;
-    }
-    if (!isFinite(maxBps) || maxBps < 1 || maxBps > 10000) {
-      toast.error("max_coverage_bps must be 1–10000");
-      return;
-    }
+function ExecuteProposalPanel({ pools: _pools }: { pools: PoolResponse[] }) {
+  const { program, wallet, walletPublicKey } = useAnchorProgram();
+  const [proposals, setProposals] = useState<ProposalAccount[]>([]);
+  const [loadingProposals, setLoadingProposals] = useState(false);
+  const [executing, setExecuting] = useState<number | null>(null);
 
-    setSubmitting(true);
+  const fetchProposals = useCallback(async () => {
+    if (!program) return;
+    setLoadingProposals(true);
     try {
-      const poolPk = new PublicKey(selectedPool);
-      const [poolConfigPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("pool_config"), poolPk.toBuffer()],
-        PROGRAM_ID
-      );
-      const { BN } = await import("@coral-xyz/anchor");
-      await (program as any).methods
-        .updatePoolConfig(new BN(minBps), new BN(maxBps))
-        .accounts({
-          authority: wallet.publicKey,
-          pool: poolPk,
-          poolConfig: poolConfigPda,
-        })
-        .rpc();
-      toast.success("pool_config updated on-chain");
+      const accounts = await (program as any).account.governanceProposal.all();
+      const now = Math.floor(Date.now() / 1000);
+      const parsed: ProposalAccount[] = accounts
+        .map((a: any) => ({
+          pubkey: a.publicKey.toBase58(),
+          id: Number(a.account.id),
+          proposer: a.account.proposer.toBase58(),
+          title: Buffer.from(a.account.title).toString("utf8").replace(/\0/g, "").trim(),
+          votesFor: Number(a.account.votesFor),
+          votesAgainst: Number(a.account.votesAgainst),
+          votingEndsAt: Number(a.account.votingEndsAt),
+          executed: a.account.executed,
+          actionType: a.account.actionType,
+          actionPayload: Array.from(a.account.actionPayload as Uint8Array),
+        }))
+        .filter(
+          (p: ProposalAccount) =>
+            !p.executed &&
+            p.votingEndsAt <= now &&
+            p.votesFor > p.votesAgainst
+        );
+      setProposals(parsed);
     } catch (e: unknown) {
-      toast.error("Update failed", { description: (e as Error).message });
+      console.error("[governance] fetch proposals:", (e as Error).message);
     } finally {
-      setSubmitting(false);
+      setLoadingProposals(false);
     }
-  };
+  }, [program]);
 
-  return (
-    <div className="card p-6 space-y-5">
-      <div>
-        <h2 className="font-semibold text-white">Update Pool Config</h2>
-        <p className="text-xs text-gray-500 mt-1">
-          Adjust premium floor / coverage cap. Requires pool authority wallet.
-        </p>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <label className="space-y-1">
-          <span className="text-xs text-gray-500">Pool</span>
-          <select
-            value={selectedPool}
-            onChange={(e) => setSelectedPool(e.target.value)}
-            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white text-sm focus:border-[var(--accent)]/50 outline-none"
-          >
-            <option value="">— select pool —</option>
-            {pools.map((p) => (
-              <option key={p.pubkey} value={p.pubkey}>
-                {COVERAGE_NAMES[p.poolType] ?? `Type ${p.poolType}`} —{" "}
-                {p.pubkey.slice(0, 8)}…
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="space-y-1">
-          <span className="text-xs text-gray-500">
-            Min Premium bps (0–10000)
-          </span>
-          <input
-            type="number"
-            value={minPremiumBps}
-            onChange={(e) => setMinPremiumBps(e.target.value)}
-            min={0}
-            max={10000}
-            step={1}
-            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white text-sm focus:border-[var(--accent)]/50 outline-none"
-          />
-          <span className="text-xs text-gray-600">
-            {(parseInt(minPremiumBps) / 100 || 0).toFixed(2)}% of payout
-          </span>
-        </label>
-        <label className="space-y-1">
-          <span className="text-xs text-gray-500">
-            Max Coverage bps (1–10000)
-          </span>
-          <input
-            type="number"
-            value={maxCoverageBps}
-            onChange={(e) => setMaxCoverageBps(e.target.value)}
-            min={1}
-            max={10000}
-            step={1}
-            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white text-sm focus:border-[var(--accent)]/50 outline-none"
-          />
-          <span className="text-xs text-gray-600">
-            {(parseInt(maxCoverageBps) / 100 || 0).toFixed(2)}% of pool TVL
-          </span>
-        </label>
-      </div>
-      <button
-        onClick={handleUpdate}
-        disabled={submitting || !wallet}
-        className="bg-[var(--accent)] hover:opacity-90 disabled:opacity-40 text-black font-bold px-6 py-2 rounded-lg text-sm transition-opacity"
-      >
-        {submitting ? "Updating…" : "Update Pool Config"}
-      </button>
-      {!wallet && (
-        <p className="text-xs text-gray-600">
-          Connect the pool authority wallet to update config.
-        </p>
-      )}
-    </div>
-  );
-}
+  useEffect(() => {
+    fetchProposals();
+  }, [fetchProposals, walletPublicKey]);
 
-function ProposeOracleAuthorityPanel({ pools }: { pools: PoolResponse[] }) {
-  const { program, wallet } = useAnchorProgram();
-  const PROGRAM_ID = new PublicKey(
-    "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan"
-  );
-
-  const [selectedPool, setSelectedPool] = useState("");
-  const [newOracle, setNewOracle] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  const handlePropose = async () => {
+  const handleExecute = async (proposal: ProposalAccount) => {
     if (!program || !wallet) {
-      toast.error("Connect pool authority wallet");
+      toast.error("Connect your wallet to execute proposals");
       return;
     }
-    if (!selectedPool) {
-      toast.error("Select a pool");
-      return;
-    }
-    let oraclePk: PublicKey;
+
+    // Decode pool pubkey from action payload
+    let poolPk: PublicKey;
     try {
-      oraclePk = new PublicKey(newOracle);
+      const buf = Buffer.from(proposal.actionPayload);
+      poolPk = new PublicKey(buf.slice(0, 32));
     } catch {
-      toast.error("Invalid oracle pubkey");
+      toast.error("Cannot decode pool from proposal payload");
       return;
     }
 
-    setSubmitting(true);
+    const [proposalPda] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("proposal"),
+        Buffer.from(new Uint8Array(8)).map((_, i) => {
+          const id = BigInt(proposal.id);
+          return Number((id >> BigInt(i * 8)) & BigInt(0xff));
+        }),
+      ],
+      PROGRAM_ID
+    );
+
+    const [poolConfigPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("pool_config"), poolPk.toBuffer()],
+      PROGRAM_ID
+    );
+
+    setExecuting(proposal.id);
     try {
-      const poolPk = new PublicKey(selectedPool);
-      const [poolConfigPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("pool_config"), poolPk.toBuffer()],
-        PROGRAM_ID
-      );
-      const [proposalPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("oracle_proposal"), poolPk.toBuffer()],
-        PROGRAM_ID
-      );
-      await (program as any).methods
-        .proposeOracleAuthority(oraclePk)
+      const { BN } = await import("@coral-xyz/anchor");
+      const tx = await (program as any).methods
+        .executeProposal(new BN(proposal.id))
         .accounts({
-          authority: wallet.publicKey,
+          executor: wallet.publicKey,
+          proposal: proposalPda,
           pool: poolPk,
           poolConfig: poolConfigPda,
-          proposal: proposalPda,
-          systemProgram: "11111111111111111111111111111111",
         })
         .rpc();
-      toast.success(
-        "Oracle authority change proposed — takes effect in 1 hour"
-      );
+      toast.success(`Proposal #${proposal.id} executed`, {
+        description: `Tx: ${tx.slice(0, 16)}…`,
+      });
+      setProposals((prev) => prev.filter((p) => p.id !== proposal.id));
     } catch (e: unknown) {
-      toast.error("Proposal failed", { description: (e as Error).message });
+      toast.error("Execution failed", { description: (e as Error).message });
     } finally {
-      setSubmitting(false);
+      setExecuting(null);
     }
   };
 
   return (
     <div className="card p-6 space-y-5">
-      <div>
-        <h2 className="font-semibold text-white">
-          Propose Oracle Authority Change
-        </h2>
-        <p className="text-xs text-gray-500 mt-1">
-          Initiates a 1-hour timelock before the new oracle authority takes
-          effect. Anyone can cancel by monitoring the proposal PDA.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-semibold text-white">Execute Passed Proposals</h2>
+          <p className="text-xs text-gray-500 mt-1">
+            Proposals that passed community vote and whose voting period has
+            ended. Anyone can execute them.
+          </p>
+        </div>
+        <button
+          onClick={fetchProposals}
+          disabled={loadingProposals || !program}
+          className="text-xs text-gray-500 hover:text-[var(--accent)] disabled:opacity-40 transition-colors"
+        >
+          {loadingProposals ? "Loading…" : "↻ Refresh"}
+        </button>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <label className="space-y-1">
-          <span className="text-xs text-gray-500">Pool</span>
-          <select
-            value={selectedPool}
-            onChange={(e) => setSelectedPool(e.target.value)}
-            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white text-sm focus:border-[var(--accent)]/50 outline-none"
-          >
-            <option value="">— select pool —</option>
-            {pools.map((p) => (
-              <option key={p.pubkey} value={p.pubkey}>
-                {COVERAGE_NAMES[p.poolType] ?? `Type ${p.poolType}`} —{" "}
-                {p.pubkey.slice(0, 8)}…
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="space-y-1">
-          <span className="text-xs text-gray-500">
-            New Oracle Authority (pubkey)
-          </span>
-          <input
-            type="text"
-            value={newOracle}
-            onChange={(e) => setNewOracle(e.target.value)}
-            placeholder="GeBW6LUY…"
-            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white text-sm font-mono focus:border-[var(--accent)]/50 outline-none"
-          />
-        </label>
-      </div>
-      <button
-        onClick={handlePropose}
-        disabled={submitting || !wallet}
-        className="bg-yellow-600 hover:opacity-90 disabled:opacity-40 text-black font-bold px-6 py-2 rounded-lg text-sm transition-opacity"
-      >
-        {submitting ? "Proposing…" : "Propose Oracle Change (1-hr timelock)"}
-      </button>
+
       {!wallet && (
-        <p className="text-xs text-gray-600">
-          Connect the pool authority wallet to propose.
-        </p>
+        <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-300">
+          Connect your wallet to load and execute proposals.
+        </div>
       )}
-    </div>
-  );
-}
 
-function ApplyOracleAuthorityPanel({ pools }: { pools: PoolResponse[] }) {
-  const { program, wallet } = useAnchorProgram();
-  const PROGRAM_ID = new PublicKey(
-    "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan"
-  );
+      {wallet && !loadingProposals && proposals.length === 0 && (
+        <div className="py-6 text-center text-sm text-gray-500">
+          No passed proposals awaiting execution.
+        </div>
+      )}
 
-  const [selectedPool, setSelectedPool] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleApply = async () => {
-    if (!program || !wallet) {
-      toast.error("Connect pool authority wallet");
-      return;
-    }
-    if (!selectedPool) {
-      toast.error("Select a pool");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const poolPk = new PublicKey(selectedPool);
-      const [poolConfigPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("pool_config"), poolPk.toBuffer()],
-        PROGRAM_ID
-      );
-      const [proposalPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("oracle_proposal"), poolPk.toBuffer()],
-        PROGRAM_ID
-      );
-      await (program as any).methods
-        .applyOracleAuthority()
-        .accounts({
-          authority: wallet.publicKey,
-          pool: poolPk,
-          poolConfig: poolConfigPda,
-          proposal: proposalPda,
-        })
-        .rpc();
-      toast.success("Oracle authority applied — proposal account closed");
-    } catch (e: unknown) {
-      toast.error("Apply failed", { description: (e as Error).message });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="card p-6 space-y-5">
-      <div>
-        <h2 className="font-semibold text-white">
-          Apply Oracle Authority Change
-        </h2>
-        <p className="text-xs text-gray-500 mt-1">
-          Applies a previously proposed oracle authority after the 1-hour
-          timelock has expired.
-        </p>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <label className="space-y-1">
-          <span className="text-xs text-gray-500">Pool</span>
-          <select
-            value={selectedPool}
-            onChange={(e) => setSelectedPool(e.target.value)}
-            className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-white text-sm focus:border-[var(--accent)]/50 outline-none"
+      <div className="space-y-3">
+        {proposals.map((proposal) => (
+          <div
+            key={proposal.id}
+            className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/30 p-4 space-y-3"
           >
-            <option value="">— select pool —</option>
-            {pools.map((p) => (
-              <option key={p.pubkey} value={p.pubkey}>
-                {COVERAGE_NAMES[p.poolType] ?? `Type ${p.poolType}`} —{" "}
-                {p.pubkey.slice(0, 8)}…
-              </option>
-            ))}
-          </select>
-        </label>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono text-gray-500">
+                    #{proposal.id}
+                  </span>
+                  <span className="text-sm font-semibold text-white">
+                    {proposal.title}
+                  </span>
+                </div>
+                <div className="mt-1 text-xs text-gray-500">
+                  {ACTION_TYPE_LABELS[proposal.actionType] ?? "Unknown action"}{" "}
+                  — {decodeActionPayload(proposal.actionType, proposal.actionPayload)}
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="text-xs text-green-400 font-medium">
+                  ✓ {proposal.votesFor} for
+                </div>
+                <div className="text-xs text-red-400">
+                  ✗ {proposal.votesAgainst} against
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => handleExecute(proposal)}
+              disabled={executing === proposal.id || !wallet}
+              className="w-full bg-[var(--accent)] hover:opacity-90 disabled:opacity-40 text-black font-bold px-4 py-2 rounded-lg text-sm transition-opacity"
+            >
+              {executing === proposal.id
+                ? "Executing…"
+                : `Execute Proposal #${proposal.id}`}
+            </button>
+          </div>
+        ))}
       </div>
-      <button
-        onClick={handleApply}
-        disabled={submitting || !wallet}
-        className="bg-green-700 hover:opacity-90 disabled:opacity-40 text-white font-bold px-6 py-2 rounded-lg text-sm transition-opacity"
-      >
-        {submitting ? "Applying…" : "Apply Oracle Change (after timelock)"}
-      </button>
-      {!wallet && (
-        <p className="text-xs text-gray-600">
-          Connect the pool authority wallet to apply.
-        </p>
-      )}
     </div>
   );
 }

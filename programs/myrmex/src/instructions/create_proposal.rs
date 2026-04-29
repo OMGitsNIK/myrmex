@@ -39,11 +39,14 @@ pub fn handler(
     title: [u8; 64],
     description: [u8; 128],
     voting_duration_secs: i64,
+    action_type: u8,
+    action_payload: [u8; 64],
 ) -> Result<()> {
     require!(
         (MIN_VOTING_SECS..=MAX_VOTING_SECS).contains(&voting_duration_secs),
         MyrmexError::InvalidConfig
     );
+    require!(action_type <= 1, MyrmexError::InvalidActionType);
 
     let clock = Clock::get()?;
     let proposal = &mut ctx.accounts.proposal;
@@ -61,10 +64,13 @@ pub fn handler(
         .ok_or(error!(MyrmexError::MathOverflow))?;
     proposal.executed = false;
     proposal.bump = ctx.bumps.proposal;
+    proposal.action_type = action_type;
+    proposal.action_payload = action_payload;
 
     msg!(
-        "Proposal #{} created: voting ends at {}",
+        "Proposal #{} created: action_type={} voting ends at {}",
         proposal_id,
+        action_type,
         proposal.voting_ends_at
     );
     Ok(())

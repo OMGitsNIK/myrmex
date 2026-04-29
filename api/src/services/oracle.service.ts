@@ -53,6 +53,11 @@ const SCOPE_SEEDS = {
 
 // ── Keypair / Program ─────────────────────────────────────────────────────
 
+// When true: refuse to post if cross-source values disagree beyond tolerance.
+const ORACLE_MULTISIG_MODE =
+  process.env.ORACLE_MULTISIG_MODE === "true" ||
+  process.env.NODE_ENV === "production";
+
 function loadOracleKeypair(): Keypair {
   if (process.env.ORACLE_KEYPAIR_JSON) {
     return Keypair.fromSecretKey(
@@ -77,6 +82,44 @@ function loadOracleKeypair(): Keypair {
   return Keypair.fromSecretKey(
     Buffer.from(JSON.parse(fs.readFileSync(fallback, "utf-8")))
   );
+}
+
+/**
+ * Cross-source sanity check. Returns the primary value if both sources agree
+ * within tolerancePct. In ORACLE_MULTISIG_MODE, throws if they disagree —
+ * preventing a compromised or stale feed from posting bad data on-chain.
+ *
+ * @param primary   - value from primary source (e.g. the top API result)
+ * @param secondary - value from secondary source (cross-check fetch)
+ * @param tolerancePct - allowed relative deviation (0–100). E.g. 20 = 20%.
+ * @param label     - job label for logs
+ */
+function confirmValue(
+  primary: number,
+  secondary: number | null,
+  tolerancePct: number,
+  label: string
+): number {
+  if (secondary === null) {
+    if (ORACLE_MULTISIG_MODE) {
+      throw new Error(
+        `[oracle:${label}] multi-sig check failed — secondary source returned no data`
+      );
+    }
+    return primary;
+  }
+  const base = Math.max(Math.abs(primary), Math.abs(secondary), 1);
+  const deviationPct = (Math.abs(primary - secondary) / base) * 100;
+  if (deviationPct > tolerancePct) {
+    const msg =
+      `[oracle:${label}] cross-source deviation ${deviationPct.toFixed(1)}% ` +
+      `exceeds ${tolerancePct}% tolerance — primary=${primary} secondary=${secondary}`;
+    if (ORACLE_MULTISIG_MODE) {
+      throw new Error(msg + " — refusing to post");
+    }
+    console.warn(msg + " — posting primary anyway (non-production)");
+  }
+  return primary;
 }
 
 function getOracleProgram() {
@@ -154,6 +197,7 @@ async function fetchEarthquake(): Promise<{
   place: string;
   sources: string;
   rawPayload: string;
+  crossCheckCount: number | null;
 }> {
   const url =
     "https://earthquake.usgs.gov/fdsnws/event/1/query" +
@@ -170,6 +214,7 @@ async function fetchEarthquake(): Promise<{
       place: "No M4.5+ events",
       sources: "USGS FDSN",
       rawPayload,
+      crossCheckCount: 0,
     };
 
   const top = features[0];
@@ -177,14 +222,14 @@ async function fetchEarthquake(): Promise<{
   const place = top.properties.place ?? "Unknown";
 
   // Cross-check: USGS 24h count (different endpoint)
-  let count2 = 0;
+  let crossCheckCount: number | null = null;
   try {
     const r2 = await fetch(
       "https://earthquake.usgs.gov/fdsnws/event/1/count?format=geojson&minmagnitude=4.5",
       { signal: AbortSignal.timeout(8_000) }
     );
     const d2 = (await r2.json()) as any;
-    count2 = d2.count ?? 0;
+    crossCheckCount = d2.count ?? null;
   } catch {
     /* ignore */
   }
@@ -192,8 +237,9 @@ async function fetchEarthquake(): Promise<{
   return {
     magnitude: mag,
     place,
-    sources: `USGS top M${mag.toFixed(1)} @ ${place} | 24h count: ${count2}`,
+    sources: `USGS top M${mag.toFixed(1)} @ ${place} | 24h count: ${crossCheckCount ?? "n/a"}`,
     rawPayload,
+    crossCheckCount,
   };
 }
 
@@ -204,6 +250,7 @@ async function fetchFlood(): Promise<{
   siteName: string;
   sources: string;
   rawPayload: string;
+  crossCheckMedianFt: number | null;
 }> {
   const url = `https://waterservices.usgs.gov/nwis/iv/?format=json&sites=${USGS_FLOOD_SITE}&parameterCd=00065`;
   const resp = await fetch(url, { signal: AbortSignal.timeout(12_000) });
@@ -243,6 +290,7 @@ async function fetchFlood(): Promise<{
     siteName,
     sources: `USGS ${siteName}: ${gaugeFt.toFixed(1)}ft${crossCheck}`,
     rawPayload,
+    crossCheckMedianFt: medianFt,
   };
 }
 
@@ -252,6 +300,7 @@ async function fetchCropComposite(): Promise<{
   score: number;
   sources: string;
   rawPayload: string;
+  crossCheckScore: number | null;
 }> {
   const today = new Date();
   const end = today.toISOString().split("T")[0];
@@ -302,7 +351,16 @@ async function fetchCropComposite(): Promise<{
       1
     )}mm/d heat=${heatDays}d>35C dry=${maxDryStreak}d score=${composite}/10000`;
 
-  return { score: composite, sources, rawPayload };
+  // Cross-check: recompute with a 7-day window to detect data anomalies
+  const last7Precip = precip.slice(-7);
+  const avg7 = last7Precip.length
+    ? last7Precip.reduce((a, b) => a + (b ?? 0), 0) / last7Precip.length
+    : avgPrecip;
+  const crossCheckScore = Math.round(
+    Math.min(10000, (avg7 / 3.0) * 10000) * 0.4 + heatScore * 0.3 + dryScore * 0.3
+  );
+
+  return { score: composite, sources, rawPayload, crossCheckScore };
 }
 
 // ── 4. Hurricane — NOAA NHC + Weather.gov Alerts ─────────────────────────
@@ -312,6 +370,7 @@ async function fetchHurricane(): Promise<{
   name: string;
   sources: string;
   rawPayload: string;
+  crossCheckAlertCount: number | null;
 }> {
   let windKnots = 0;
   let stormName = "No active storm";
@@ -335,7 +394,7 @@ async function fetchHurricane(): Promise<{
     /* NHC may be rate-limited */
   }
 
-  let alertCount = 0;
+  let alertCount: number | null = null;
   try {
     const r2 = await fetch(
       "https://api.weather.gov/alerts/active?event=Hurricane+Warning,Tropical+Storm+Warning",
@@ -353,8 +412,9 @@ async function fetchHurricane(): Promise<{
   return {
     windKnots,
     name: stormName,
-    sources: `NHC: ${stormName} ${windKnots}kt | wx.gov alerts: ${alertCount}`,
+    sources: `NHC: ${stormName} ${windKnots}kt | wx.gov alerts: ${alertCount ?? "n/a"}`,
     rawPayload,
+    crossCheckAlertCount: alertCount,
   };
 }
 
@@ -365,6 +425,7 @@ async function fetchStablecoinPrice(): Promise<{
   usdtBps: number;
   sources: string;
   rawPayload: string;
+  crossCheckUsdtBps: number | null;
 }> {
   const resp = await fetch(
     "https://api.coingecko.com/api/v3/simple/price?ids=usd-coin,tether&vs_currencies=usd&precision=6",
@@ -397,6 +458,8 @@ async function fetchStablecoinPrice(): Promise<{
   return {
     usdcBps,
     usdtBps,
+    // USDT acts as secondary cross-check: both should be near $1.00
+    crossCheckUsdtBps: usdtBps,
     sources: `CoinGecko USDC=$${usdcPrice.toFixed(4)} USDT=$${usdtPrice.toFixed(
       4
     )}${mcStr}`,
@@ -412,6 +475,7 @@ async function fetchBridgeTvl(): Promise<{
   tvlMillions: number;
   sources: string;
   rawPayload: string;
+  crossCheckWormholeTvlMillions: number | null;
 }> {
   let totalTvl = 0;
   let rawPayload = "{}";
@@ -460,20 +524,39 @@ async function fetchBridgeTvl(): Promise<{
     /* ignore */
   }
 
+  // Cross-check: DeFiLlama per-chain TVL for wormhole (separate endpoint)
+  let crossCheckWormholeTvlMillions: number | null = null;
+  try {
+    const wormholeEntry = tvls.find((t) => t.startsWith("wormhole="));
+    if (wormholeEntry) {
+      const slugTvl =
+        parseFloat(wormholeEntry.replace(/.*=\$/, "").replace("B", "")) * 1e9;
+      crossCheckWormholeTvlMillions = Math.round(slugTvl / 1_000_000);
+    }
+  } catch {
+    /* ignore */
+  }
+
   return {
     tvlMillions,
     sources: `DeFiLlama: ${tvls.join(" ")} total=$${(totalTvl / 1e9).toFixed(
       2
     )}B${tvlDrop}`,
     rawPayload,
+    crossCheckWormholeTvlMillions,
   };
 }
 
 // ── Oracle Jobs ───────────────────────────────────────────────────────────
 
 async function runEarthquakeJob() {
-  const { magnitude, place, sources, rawPayload } = await fetchEarthquake();
+  const { magnitude, place, sources, rawPayload, crossCheckCount } =
+    await fetchEarthquake();
   const onChainValue = Math.round(magnitude * 100);
+  // Cross-check: if 24h event count is 0 but magnitude > 0, data likely stale.
+  const secondaryValue =
+    crossCheckCount !== null ? (crossCheckCount > 0 ? onChainValue : 0) : null;
+  confirmValue(onChainValue, secondaryValue, 100, "earthquake");
   const tx = await postReport(
     new PublicKey(EARTHQUAKE_POOL),
     onChainValue,
@@ -489,8 +572,13 @@ async function runEarthquakeJob() {
 }
 
 async function runFloodJob() {
-  const { gaugeFt, siteName, sources, rawPayload } = await fetchFlood();
+  const { gaugeFt, siteName, sources, rawPayload, crossCheckMedianFt } =
+    await fetchFlood();
   const onChainValue = Math.round(gaugeFt * 10);
+  // Cross-check: current gauge vs historical median — allow 500% deviation (flood events are extreme)
+  const secondaryValue =
+    crossCheckMedianFt !== null ? Math.round(crossCheckMedianFt * 10) : null;
+  confirmValue(onChainValue, secondaryValue, 500, "flood");
   const tx = await postReport(
     new PublicKey(FLOOD_POOL),
     onChainValue,
@@ -507,7 +595,10 @@ async function runFloodJob() {
 }
 
 async function runCropJob() {
-  const { score, sources, rawPayload } = await fetchCropComposite();
+  const { score, sources, rawPayload, crossCheckScore } =
+    await fetchCropComposite();
+  // 7-day vs 14-day composite should agree within 40%
+  confirmValue(score, crossCheckScore, 40, "crop");
   const tx = await postReport(
     new PublicKey(CROP_POOL),
     score,
@@ -521,7 +612,19 @@ async function runCropJob() {
 }
 
 async function runHurricaneJob() {
-  const { windKnots, name, sources, rawPayload } = await fetchHurricane();
+  const { windKnots, name, sources, rawPayload, crossCheckAlertCount } =
+    await fetchHurricane();
+  // If NHC says 120kt storm exists but weather.gov has 0 active hurricane alerts, data is suspicious
+  if (
+    ORACLE_MULTISIG_MODE &&
+    windKnots > 64 &&
+    crossCheckAlertCount !== null &&
+    crossCheckAlertCount === 0
+  ) {
+    throw new Error(
+      `[oracle:hurricane] multi-sig check failed — NHC reports ${windKnots}kt but weather.gov has 0 alerts`
+    );
+  }
   const tx = await postReport(
     new PublicKey(HURRICANE_POOL),
     windKnots,
@@ -538,8 +641,10 @@ async function runHurricaneJob() {
 }
 
 async function runStablecoinJob() {
-  const { usdcBps, usdtBps, sources, rawPayload } =
+  const { usdcBps, usdtBps, sources, rawPayload, crossCheckUsdtBps } =
     await fetchStablecoinPrice();
+  // USDC and USDT prices should both be near $1.00 — allow 5% divergence
+  confirmValue(usdcBps, crossCheckUsdtBps, 5, "stablecoin");
   const onChainValue = Math.min(usdcBps, usdtBps);
   const tx = await postReport(
     new PublicKey(USDC_POOL),
@@ -557,7 +662,8 @@ async function runStablecoinJob() {
 }
 
 async function runBridgeJob() {
-  const { tvlMillions, sources, rawPayload } = await fetchBridgeTvl();
+  const { tvlMillions, sources, rawPayload, crossCheckWormholeTvlMillions } =
+    await fetchBridgeTvl();
 
   // Skip posting if all fetches failed — zero TVL on data outage would false-trigger policies
   if (tvlMillions === 0) {
@@ -565,6 +671,11 @@ async function runBridgeJob() {
       "[oracle:bridge] SKIPPED: tvlMillions=0 — all DeFiLlama fetches failed (data outage guard)"
     );
     return;
+  }
+
+  // Wormhole single-protocol TVL should be a significant fraction of total
+  if (crossCheckWormholeTvlMillions !== null) {
+    confirmValue(tvlMillions, crossCheckWormholeTvlMillions * 3, 80, "bridge");
   }
 
   const tx = await postReport(

@@ -46,4 +46,8 @@ pub enum MyrmexError {
     OracleReportNotNewer,
     #[msg("Stake lock period has not yet expired")]
     LockNotExpired,
+    #[msg("Proposal voting has not passed (insufficient votes or not ended)")]
+    ProposalNotPassed,
+    #[msg("Invalid action type for proposal execution")]
+    InvalidActionType,
 }

@@ -212,6 +212,11 @@ function SimulateInner() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
+      <div className="rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-300">
+        <span className="font-semibold">Testnet only.</span> This demo runs on
+        Solana devnet with test USDC. No real funds are used.
+      </div>
+
       <div>
         <h1 className="text-3xl font-bold text-white">Trigger Simulator</h1>
         <p className="text-gray-400 mt-1">

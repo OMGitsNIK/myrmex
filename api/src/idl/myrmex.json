@@ -110,6 +110,30 @@
           "signer": true
         },
         {
+          "name": "voter_stake",
+          "docs": [
+            "Voter must have MYR staked; their stake weight is used as the vote weight."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "voter"
+              }
+            ]
+          }
+        },
+        {
           "name": "proposal",
           "writable": true,
           "pda": {
@@ -183,6 +207,68 @@
         {
           "name": "vote",
           "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "close_policy",
+      "discriminator": [
+        55,
+        42,
+        248,
+        229,
+        222,
+        138,
+        26,
+        252
+      ],
+      "accounts": [
+        {
+          "name": "policyholder",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "policy",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "policyholder"
+              },
+              {
+                "kind": "account",
+                "path": "policy.pool",
+                "account": "PolicyVault"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "i64"
         }
       ]
     },
@@ -402,6 +488,30 @@
           "signer": true
         },
         {
+          "name": "proposer_stake",
+          "docs": [
+            "Proposer must have MYR staked — prevents spam from wallets with no skin in the game."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "proposer"
+              }
+            ]
+          }
+        },
+        {
           "name": "proposal",
           "writable": true,
           "pda": {
@@ -457,6 +567,104 @@
         {
           "name": "voting_duration_secs",
           "type": "i64"
+        },
+        {
+          "name": "action_type",
+          "type": "u8"
+        },
+        {
+          "name": "action_payload",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "execute_proposal",
+      "discriminator": [
+        186,
+        60,
+        116,
+        133,
+        108,
+        128,
+        111,
+        28
+      ],
+      "accounts": [
+        {
+          "name": "executor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "proposal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  112,
+                  111,
+                  115,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "proposal_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool",
+          "docs": [
+            "Pool whose config is being updated. Decoded from action_payload."
+          ]
+        },
+        {
+          "name": "pool_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "proposal_id",
+          "type": "u64"
         }
       ]
     },
@@ -1425,7 +1633,9 @@
         {
           "name": "oracle_report",
           "docs": [
-            "Oracle report posted by the pool's authorized oracle service.",
+            "Oracle report posted by the oracle that was authoritative when this policy was created.",
+            "Validates against policy.trigger_condition.oracle_pubkey — not the current pool config —",
+            "so oracle authority rotation cannot retroactively break in-force policies.",
             "Seeds: [b\"oracle_report\", pool.key(), policy.trigger_condition.scope_hash]"
           ],
           "pda": {
@@ -1568,6 +1778,249 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "unstake_myr",
+      "discriminator": [
+        76,
+        58,
+        157,
+        191,
+        23,
+        130,
+        120,
+        187
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "stake_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "myr_mint"
+        },
+        {
+          "name": "owner_myr",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "myr_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "stake_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "stake_account"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "myr_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "update_pool_config",
@@ -1983,6 +2436,32 @@
       ]
     },
     {
+      "name": "MyrStaked",
+      "discriminator": [
+        67,
+        191,
+        179,
+        80,
+        76,
+        255,
+        175,
+        214
+      ]
+    },
+    {
+      "name": "MyrUnstaked",
+      "discriminator": [
+        230,
+        46,
+        80,
+        7,
+        223,
+        17,
+        154,
+        238
+      ]
+    },
+    {
       "name": "PayoutExecuted",
       "discriminator": [
         88,
@@ -2135,6 +2614,26 @@
       "code": 6019,
       "name": "TimelockNotExpired",
       "msg": "Oracle authority timelock has not expired yet"
+    },
+    {
+      "code": 6020,
+      "name": "OracleReportNotNewer",
+      "msg": "Oracle report must have a later timestamp than the previous report"
+    },
+    {
+      "code": 6021,
+      "name": "LockNotExpired",
+      "msg": "Stake lock period has not yet expired"
+    },
+    {
+      "code": 6022,
+      "name": "ProposalNotPassed",
+      "msg": "Proposal voting has not passed (insufficient votes or not ended)"
+    },
+    {
+      "code": 6023,
+      "name": "InvalidActionType",
+      "msg": "Invalid action type for proposal execution"
     }
   ],
   "types": [
@@ -2192,6 +2691,19 @@
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "action_type",
+            "type": "u8"
+          },
+          {
+            "name": "action_payload",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
           }
         ]
       }
@@ -2215,6 +2727,50 @@
           },
           {
             "name": "lp_tokens_burned",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MyrStaked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "total_staked",
+            "type": "u64"
+          },
+          {
+            "name": "lock_until",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MyrUnstaked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "remaining_staked",
             "type": "u64"
           }
         ]

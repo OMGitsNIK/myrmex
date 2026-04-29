@@ -116,6 +116,8 @@ pub mod myrmex {
         title: [u8; 64],
         description: [u8; 128],
         voting_duration_secs: i64,
+        action_type: u8,
+        action_payload: [u8; 64],
     ) -> Result<()> {
         instructions::create_proposal::handler(
             ctx,
@@ -123,6 +125,8 @@ pub mod myrmex {
             title,
             description,
             voting_duration_secs,
+            action_type,
+            action_payload,
         )
     }
 
@@ -132,5 +136,9 @@ pub mod myrmex {
 
     pub fn close_policy(ctx: Context<ClosePolicy>, nonce: i64) -> Result<()> {
         instructions::close_policy::handler(ctx, nonce)
+    }
+
+    pub fn execute_proposal(ctx: Context<ExecuteProposal>, proposal_id: u64) -> Result<()> {
+        instructions::execute_proposal::handler(ctx, proposal_id)
     }
 }
