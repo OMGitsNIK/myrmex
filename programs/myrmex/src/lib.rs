@@ -190,6 +190,14 @@ pub mod myrmex {
     }
 
     // ── Feature 5: Tranched liquidity ─────────────────────────────────────
+    pub fn migrate_pool(ctx: Context<MigratePool>) -> Result<()> {
+        instructions::migrate_pool::handler(ctx)
+    }
+
+    pub fn migrate_pool_config(ctx: Context<MigratePoolConfig>) -> Result<()> {
+        instructions::migrate_pool_config::handler(ctx)
+    }
+
     pub fn fund_tranche(ctx: Context<FundTranche>, amount: u64, tranche: u8) -> Result<()> {
         instructions::fund_tranche::handler(ctx, amount, tranche)
     }

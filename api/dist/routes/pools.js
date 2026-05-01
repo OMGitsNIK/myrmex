@@ -46,13 +46,17 @@ router.get("/", async (_req, res) => {
             // Fetch pool_config if it exists
             const [poolConfigPda] = web3_js_1.PublicKey.findProgramAddressSync([Buffer.from("pool_config"), publicKey.toBuffer()], PROGRAM_ID);
             let poolConfig = null;
+            let reserveBalance = 0;
             try {
                 const cfg = await program.account.poolConfig.fetch(poolConfigPda);
+                reserveBalance = cfg.reserveBalance?.toNumber() ?? 0;
                 poolConfig = {
                     pubkey: poolConfigPda.toBase58(),
                     oracleAuthority: cfg.oracleAuthority.toBase58(),
                     minPremiumBps: cfg.minPremiumBps.toNumber(),
                     maxCoverageBps: cfg.maxCoverageBps.toNumber(),
+                    reserveBalance,
+                    demoMode: cfg.demoMode ?? true,
                 };
             }
             catch {
@@ -77,6 +81,10 @@ router.get("/", async (_req, res) => {
                 vault: acc.vault.toBase58(),
                 usdcMint: acc.usdcMint.toBase58(),
                 lpTokenMint: acc.lpTokenMint.toBase58(),
+                juniorLiquidity: acc.juniorLiquidity?.toNumber() ?? 0,
+                mezzanineLiquidity: acc.mezzanineLiquidity?.toNumber() ?? 0,
+                seniorLiquidity: acc.seniorLiquidity?.toNumber() ?? 0,
+                reserveBalance,
                 poolConfig,
             };
         }));

@@ -1815,6 +1815,64 @@
       "args": []
     },
     {
+      "name": "migrate_pool",
+      "discriminator": [
+        55,
+        170,
+        171,
+        123,
+        210,
+        69,
+        39,
+        172
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "migrate_pool_config",
+      "discriminator": [
+        240,
+        220,
+        251,
+        238,
+        21,
+        44,
+        129,
+        39
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool_config",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "post_oracle_report",
       "discriminator": [
         82,

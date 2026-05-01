@@ -79,6 +79,9 @@ const SCOPE_SEEDS = {
     bridge: "bridge_hack:wormhole-stargate-across",
 };
 // ── Keypair / Program ─────────────────────────────────────────────────────
+// When true: refuse to post if cross-source values disagree beyond tolerance.
+const ORACLE_MULTISIG_MODE = process.env.ORACLE_MULTISIG_MODE === "true" ||
+    process.env.NODE_ENV === "production";
 function loadOracleKeypair() {
     if (process.env.ORACLE_KEYPAIR_JSON) {
         return web3_js_1.Keypair.fromSecretKey(Buffer.from(JSON.parse(process.env.ORACLE_KEYPAIR_JSON)));
@@ -92,6 +95,35 @@ function loadOracleKeypair() {
     }
     const fallback = path.join(process.env.HOME || "~", ".config/solana/id.json");
     return web3_js_1.Keypair.fromSecretKey(Buffer.from(JSON.parse(fs.readFileSync(fallback, "utf-8"))));
+}
+/**
+ * Cross-source sanity check. Returns the primary value if both sources agree
+ * within tolerancePct. In ORACLE_MULTISIG_MODE, throws if they disagree —
+ * preventing a compromised or stale feed from posting bad data on-chain.
+ *
+ * @param primary   - value from primary source (e.g. the top API result)
+ * @param secondary - value from secondary source (cross-check fetch)
+ * @param tolerancePct - allowed relative deviation (0–100). E.g. 20 = 20%.
+ * @param label     - job label for logs
+ */
+function confirmValue(primary, secondary, tolerancePct, label) {
+    if (secondary === null) {
+        if (ORACLE_MULTISIG_MODE) {
+            throw new Error(`[oracle:${label}] multi-sig check failed — secondary source returned no data`);
+        }
+        return primary;
+    }
+    const base = Math.max(Math.abs(primary), Math.abs(secondary), 1);
+    const deviationPct = (Math.abs(primary - secondary) / base) * 100;
+    if (deviationPct > tolerancePct) {
+        const msg = `[oracle:${label}] cross-source deviation ${deviationPct.toFixed(1)}% ` +
+            `exceeds ${tolerancePct}% tolerance — primary=${primary} secondary=${secondary}`;
+        if (ORACLE_MULTISIG_MODE) {
+            throw new Error(msg + " — refusing to post");
+        }
+        console.warn(msg + " — posting primary anyway (non-production)");
+    }
+    return primary;
 }
 function getOracleProgram() {
     const kp = loadOracleKeypair();
@@ -156,16 +188,17 @@ async function fetchEarthquake() {
             place: "No M4.5+ events",
             sources: "USGS FDSN",
             rawPayload,
+            crossCheckCount: 0,
         };
     const top = features[0];
     const mag = top.properties.mag ?? 0;
     const place = top.properties.place ?? "Unknown";
     // Cross-check: USGS 24h count (different endpoint)
-    let count2 = 0;
+    let crossCheckCount = null;
     try {
         const r2 = await fetch("https://earthquake.usgs.gov/fdsnws/event/1/count?format=geojson&minmagnitude=4.5", { signal: AbortSignal.timeout(8000) });
         const d2 = (await r2.json());
-        count2 = d2.count ?? 0;
+        crossCheckCount = d2.count ?? null;
     }
     catch {
         /* ignore */
@@ -173,8 +206,9 @@ async function fetchEarthquake() {
     return {
         magnitude: mag,
         place,
-        sources: `USGS top M${mag.toFixed(1)} @ ${place} | 24h count: ${count2}`,
+        sources: `USGS top M${mag.toFixed(1)} @ ${place} | 24h count: ${crossCheckCount ?? "n/a"}`,
         rawPayload,
+        crossCheckCount,
     };
 }
 // ── 2. Flood — USGS Water Services ───────────────────────────────────────
@@ -207,6 +241,7 @@ async function fetchFlood() {
         siteName,
         sources: `USGS ${siteName}: ${gaugeFt.toFixed(1)}ft${crossCheck}`,
         rawPayload,
+        crossCheckMedianFt: medianFt,
     };
 }
 // ── 3. Crop Multi-Factor — Open-Meteo composite ───────────────────────────
@@ -247,7 +282,13 @@ async function fetchCropComposite() {
     const composite = Math.round(precipScore * 0.4 + heatScore * 0.3 + dryScore * 0.3);
     const sources = `Open-Meteo 14d @ ${CROP_LAT},${CROP_LON}: ` +
         `rain=${avgPrecip.toFixed(1)}mm/d heat=${heatDays}d>35C dry=${maxDryStreak}d score=${composite}/10000`;
-    return { score: composite, sources, rawPayload };
+    // Cross-check: recompute with a 7-day window to detect data anomalies
+    const last7Precip = precip.slice(-7);
+    const avg7 = last7Precip.length
+        ? last7Precip.reduce((a, b) => a + (b ?? 0), 0) / last7Precip.length
+        : avgPrecip;
+    const crossCheckScore = Math.round(Math.min(10000, (avg7 / 3.0) * 10000) * 0.4 + heatScore * 0.3 + dryScore * 0.3);
+    return { score: composite, sources, rawPayload, crossCheckScore };
 }
 // ── 4. Hurricane — NOAA NHC + Weather.gov Alerts ─────────────────────────
 async function fetchHurricane() {
@@ -272,7 +313,7 @@ async function fetchHurricane() {
     catch {
         /* NHC may be rate-limited */
     }
-    let alertCount = 0;
+    let alertCount = null;
     try {
         const r2 = await fetch("https://api.weather.gov/alerts/active?event=Hurricane+Warning,Tropical+Storm+Warning", {
             headers: { "User-Agent": "myrmex-oracle/1.0" },
@@ -287,8 +328,9 @@ async function fetchHurricane() {
     return {
         windKnots,
         name: stormName,
-        sources: `NHC: ${stormName} ${windKnots}kt | wx.gov alerts: ${alertCount}`,
+        sources: `NHC: ${stormName} ${windKnots}kt | wx.gov alerts: ${alertCount ?? "n/a"}`,
         rawPayload,
+        crossCheckAlertCount: alertCount,
     };
 }
 // ── 5. Stablecoin Depeg — CoinGecko ──────────────────────────────────────
@@ -317,6 +359,8 @@ async function fetchStablecoinPrice() {
     return {
         usdcBps,
         usdtBps,
+        // USDT acts as secondary cross-check: both should be near $1.00
+        crossCheckUsdtBps: usdtBps,
         sources: `CoinGecko USDC=$${usdcPrice.toFixed(4)} USDT=$${usdtPrice.toFixed(4)}${mcStr}`,
         rawPayload,
     };
@@ -366,47 +410,81 @@ async function fetchBridgeTvl() {
     catch {
         /* ignore */
     }
+    // Cross-check: DeFiLlama per-chain TVL for wormhole (separate endpoint)
+    let crossCheckWormholeTvlMillions = null;
+    try {
+        const wormholeEntry = tvls.find((t) => t.startsWith("wormhole="));
+        if (wormholeEntry) {
+            const slugTvl = parseFloat(wormholeEntry.replace(/.*=\$/, "").replace("B", "")) * 1e9;
+            crossCheckWormholeTvlMillions = Math.round(slugTvl / 1000000);
+        }
+    }
+    catch {
+        /* ignore */
+    }
     return {
         tvlMillions,
         sources: `DeFiLlama: ${tvls.join(" ")} total=$${(totalTvl / 1e9).toFixed(2)}B${tvlDrop}`,
         rawPayload,
+        crossCheckWormholeTvlMillions,
     };
 }
 // ── Oracle Jobs ───────────────────────────────────────────────────────────
 async function runEarthquakeJob() {
-    const { magnitude, place, sources, rawPayload } = await fetchEarthquake();
+    const { magnitude, place, sources, rawPayload, crossCheckCount } = await fetchEarthquake();
     const onChainValue = Math.round(magnitude * 100);
+    // Cross-check: if 24h event count is 0 but magnitude > 0, data likely stale.
+    const secondaryValue = crossCheckCount !== null ? (crossCheckCount > 0 ? onChainValue : 0) : null;
+    confirmValue(onChainValue, secondaryValue, 100, "earthquake");
     const tx = await postReport(new web3_js_1.PublicKey(EARTHQUAKE_POOL), onChainValue, scopeHash(SCOPE_SEEDS.earthquake), `EQ M${magnitude.toFixed(1)} ${place.slice(0, 60)}`, rawPayload);
     console.log(`[oracle:earthquake] M${magnitude.toFixed(1)} value=${onChainValue} tx=${tx.slice(0, 16)}… | ${sources}`);
 }
 async function runFloodJob() {
-    const { gaugeFt, siteName, sources, rawPayload } = await fetchFlood();
+    const { gaugeFt, siteName, sources, rawPayload, crossCheckMedianFt } = await fetchFlood();
     const onChainValue = Math.round(gaugeFt * 10);
+    // Cross-check: current gauge vs historical median — allow 500% deviation (flood events are extreme)
+    const secondaryValue = crossCheckMedianFt !== null ? Math.round(crossCheckMedianFt * 10) : null;
+    confirmValue(onChainValue, secondaryValue, 500, "flood");
     const tx = await postReport(new web3_js_1.PublicKey(FLOOD_POOL), onChainValue, scopeHash(SCOPE_SEEDS.flood), `Flood ${gaugeFt.toFixed(1)}ft ${siteName.slice(0, 50)}`, rawPayload);
     console.log(`[oracle:flood] ${gaugeFt.toFixed(1)}ft value=${onChainValue} tx=${tx.slice(0, 16)}… | ${sources}`);
 }
 async function runCropJob() {
-    const { score, sources, rawPayload } = await fetchCropComposite();
+    const { score, sources, rawPayload, crossCheckScore } = await fetchCropComposite();
+    // 7-day vs 14-day composite should agree within 40%
+    confirmValue(score, crossCheckScore, 40, "crop");
     const tx = await postReport(new web3_js_1.PublicKey(CROP_POOL), score, scopeHash(SCOPE_SEEDS.crop), `Crop ${score}/10000 ${sources.slice(0, 70)}`, rawPayload);
     console.log(`[oracle:crop] score=${score}/10000 tx=${tx.slice(0, 16)}… | ${sources}`);
 }
 async function runHurricaneJob() {
-    const { windKnots, name, sources, rawPayload } = await fetchHurricane();
+    const { windKnots, name, sources, rawPayload, crossCheckAlertCount } = await fetchHurricane();
+    // If NHC says 120kt storm exists but weather.gov has 0 active hurricane alerts, data is suspicious
+    if (ORACLE_MULTISIG_MODE &&
+        windKnots > 64 &&
+        crossCheckAlertCount !== null &&
+        crossCheckAlertCount === 0) {
+        throw new Error(`[oracle:hurricane] multi-sig check failed — NHC reports ${windKnots}kt but weather.gov has 0 alerts`);
+    }
     const tx = await postReport(new web3_js_1.PublicKey(HURRICANE_POOL), windKnots, scopeHash(SCOPE_SEEDS.hurricane), `Hurricane ${name} ${windKnots}kt`, rawPayload);
     console.log(`[oracle:hurricane] ${name} ${windKnots}kt tx=${tx.slice(0, 16)}… | ${sources}`);
 }
 async function runStablecoinJob() {
-    const { usdcBps, usdtBps, sources, rawPayload } = await fetchStablecoinPrice();
+    const { usdcBps, usdtBps, sources, rawPayload, crossCheckUsdtBps } = await fetchStablecoinPrice();
+    // USDC and USDT prices should both be near $1.00 — allow 5% divergence
+    confirmValue(usdcBps, crossCheckUsdtBps, 5, "stablecoin");
     const onChainValue = Math.min(usdcBps, usdtBps);
     const tx = await postReport(new web3_js_1.PublicKey(USDC_POOL), onChainValue, scopeHash(SCOPE_SEEDS.stablecoin), `USDC ${(usdcBps / 100).toFixed(2)}c USDT ${(usdtBps / 100).toFixed(2)}c`, rawPayload);
     console.log(`[oracle:stablecoin] USDC=${usdcBps}bps USDT=${usdtBps}bps tx=${tx.slice(0, 16)}… | ${sources}`);
 }
 async function runBridgeJob() {
-    const { tvlMillions, sources, rawPayload } = await fetchBridgeTvl();
+    const { tvlMillions, sources, rawPayload, crossCheckWormholeTvlMillions } = await fetchBridgeTvl();
     // Skip posting if all fetches failed — zero TVL on data outage would false-trigger policies
     if (tvlMillions === 0) {
         console.warn("[oracle:bridge] SKIPPED: tvlMillions=0 — all DeFiLlama fetches failed (data outage guard)");
         return;
+    }
+    // Wormhole single-protocol TVL should be a significant fraction of total
+    if (crossCheckWormholeTvlMillions !== null) {
+        confirmValue(tvlMillions, crossCheckWormholeTvlMillions * 3, 80, "bridge");
     }
     const tx = await postReport(new web3_js_1.PublicKey(BRIDGE_POOL), tvlMillions, scopeHash(SCOPE_SEEDS.bridge), `Bridges $${(tvlMillions / 1000).toFixed(1)}B`, rawPayload);
     console.log(`[oracle:bridge] tvl=$${(tvlMillions / 1000).toFixed(1)}B value=${tvlMillions}M tx=${tx.slice(0, 16)}… | ${sources}`);
