@@ -24,6 +24,7 @@ pub fn handler(
     ctx: Context<UpdatePoolConfig>,
     min_premium_bps: u64,
     max_coverage_bps: u64,
+    demo_mode: bool,
 ) -> Result<()> {
     require!(
         (50..=10_000).contains(&min_premium_bps),
@@ -42,6 +43,7 @@ pub fn handler(
     let config = &mut ctx.accounts.pool_config;
     config.min_premium_bps = min_premium_bps;
     config.max_coverage_bps = max_coverage_bps;
+    config.demo_mode = demo_mode;
 
     Ok(())
 }

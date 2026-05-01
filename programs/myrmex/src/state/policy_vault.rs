@@ -1,14 +1,14 @@
 use anchor_lang::prelude::*;
 
+/// Legacy enum — not used at runtime (pool_type is stored as u8, indices 0–5).
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
 pub enum CoverageType {
-    FlightDelay,
-    CropDrought,
-    CropFlood,
-    DefiHack,
-    StablecoinDepeg,
-    Hurricane,
-    Hospitalization,
+    Earthquake,      // 0 — Earthquake-Pacific
+    Flood,           // 1 — Flood-US-Rivers
+    CropMultiPeril,  // 2 — Crop-MultiF (drought + flood + freeze)
+    Hurricane,       // 3 — Hurricane-Gulf
+    StablecoinDepeg, // 4 — USDC-Depeg
+    BridgeHack,      // 5 — Bridge-Hack
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]

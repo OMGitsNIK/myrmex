@@ -28,6 +28,7 @@ interface PoolResponse {
   totalLocked: number;
   available: number;
   utilizationPct: string;
+  usdcMint?: string;
   estimatedApy: string;
   activePolicies: number;
   isActive: boolean;
@@ -357,6 +358,9 @@ export default function GovernanceDashboardPage() {
       {/* Proposal Execution Panel */}
       <ExecuteProposalPanel pools={pools} />
 
+      {/* Pool Management Panel */}
+      <PoolManagementPanel pools={pools} />
+
       {/* Payout Queue Panel */}
       <PayoutQueuePanel />
     </div>
@@ -558,6 +562,146 @@ function ExecuteProposalPanel({ pools: _ }: { pools: PoolResponse[] }) {
             </button>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function PoolManagementPanel({ pools }: { pools: PoolResponse[] }) {
+  const { program, wallet } = useAnchorProgram();
+  const [acting, setActing] = useState<string | null>(null);
+
+  const handleToggleActive = async (pool: PoolResponse, active: boolean) => {
+    if (!program || !wallet) { toast.error("Connect wallet"); return; }
+    setActing(pool.pubkey + "_active");
+    try {
+      await (program as any).methods
+        .togglePoolActive(active)
+        .accounts({ authority: wallet.publicKey, pool: new PublicKey(pool.pubkey) })
+        .rpc();
+      toast.success(`Pool ${active ? "resumed" : "paused"} — reload to see updated state`);
+    } catch (e: unknown) {
+      toast.error("Failed", { description: (e as Error).message });
+    } finally { setActing(null); }
+  };
+
+  const handleToggleDemo = async (pool: PoolResponse, demoMode: boolean) => {
+    if (!program || !wallet) { toast.error("Connect wallet"); return; }
+    setActing(pool.pubkey + "_demo");
+    try {
+      const [poolConfigPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("pool_config"), new PublicKey(pool.pubkey).toBuffer()],
+        PROGRAM_ID
+      );
+      const cfg = await (program as any).account.poolConfig.fetch(poolConfigPda);
+      await (program as any).methods
+        .updatePoolConfig(cfg.minPremiumBps, cfg.maxCoverageBps, demoMode)
+        .accounts({ authority: wallet.publicKey, pool: new PublicKey(pool.pubkey), poolConfig: poolConfigPda })
+        .rpc();
+      toast.success(`Demo mode ${demoMode ? "enabled" : "disabled"} for pool`);
+    } catch (e: unknown) {
+      toast.error("Failed", { description: (e as Error).message });
+    } finally { setActing(null); }
+  };
+
+  const handleInitReserve = async (pool: PoolResponse) => {
+    if (!program || !wallet) { toast.error("Connect wallet"); return; }
+    setActing(pool.pubkey + "_reserve");
+    try {
+      const poolPk = new PublicKey(pool.pubkey);
+      const [reserveVaultPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("reserve_vault"), poolPk.toBuffer()],
+        PROGRAM_ID
+      );
+      const { TOKEN_PROGRAM_ID: SPL_TOKEN } = await import("@solana/spl-token");
+      const { ASSOCIATED_TOKEN_PROGRAM_ID } = await import("@solana/spl-token");
+      await (program as any).methods
+        .initializeReserve()
+        .accounts({
+          authority: wallet.publicKey,
+          pool: poolPk,
+          reserveVault: reserveVaultPda,
+          usdcMint: new PublicKey(pool.usdcMint || ""),
+          tokenProgram: SPL_TOKEN,
+          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc();
+      toast.success("Reserve vault initialized — premium splits now active");
+    } catch (e: unknown) {
+      const msg = (e as Error).message;
+      if (msg.includes("already in use")) toast.info("Reserve vault already initialized");
+      else toast.error("Failed", { description: msg });
+    } finally { setActing(null); }
+  };
+
+  if (pools.length === 0) return null;
+
+  return (
+    <div className="card p-6 space-y-5">
+      <div>
+        <h2 className="font-semibold text-white">Pool Management</h2>
+        <p className="text-xs text-gray-500 mt-1">
+          Pool authority actions: pause pools, toggle demo mode, initialize reserve vaults.
+        </p>
+      </div>
+
+      {!wallet && (
+        <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-300">
+          Connect the pool authority wallet to manage pools.
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {pools.map((pool) => {
+          const poolName = COVERAGE_NAMES[pool.poolType] ?? `Pool ${pool.poolType}`;
+          const demoMode = (pool as any).poolConfig?.demoMode ?? true;
+          return (
+            <div key={pool.pubkey} className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)]/30 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <div className="text-sm font-semibold text-white">{poolName}</div>
+                  <div className="text-xs text-gray-500 font-mono">{pool.pubkey.slice(0, 12)}…</div>
+                </div>
+                <div className="flex gap-2 text-xs">
+                  <span className={`px-2 py-0.5 rounded font-medium ${pool.isActive ? "bg-[var(--accent-dim)] text-[var(--accent)]" : "bg-red-500/20 text-red-400"}`}>
+                    {pool.isActive ? "Active" : "Paused"}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded font-medium ${demoMode ? "bg-yellow-500/20 text-yellow-400" : "bg-gray-700 text-gray-400"}`}>
+                    {demoMode ? "Demo ON" : "Demo OFF"}
+                  </span>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleToggleActive(pool, !pool.isActive)}
+                  disabled={acting === pool.pubkey + "_active" || !wallet}
+                  className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors disabled:opacity-40 ${
+                    pool.isActive
+                      ? "border-red-500/60 text-red-400 hover:border-red-400"
+                      : "border-[var(--accent)]/60 text-[var(--accent)] hover:border-[var(--accent)]"
+                  }`}
+                >
+                  {acting === pool.pubkey + "_active" ? "…" : pool.isActive ? "Pause Pool" : "Resume Pool"}
+                </button>
+                <button
+                  onClick={() => handleToggleDemo(pool, !demoMode)}
+                  disabled={acting === pool.pubkey + "_demo" || !wallet}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-yellow-500/40 text-yellow-400 hover:border-yellow-400 font-medium transition-colors disabled:opacity-40"
+                >
+                  {acting === pool.pubkey + "_demo" ? "…" : demoMode ? "Disable Demo Mode" : "Enable Demo Mode"}
+                </button>
+                <button
+                  onClick={() => handleInitReserve(pool)}
+                  disabled={acting === pool.pubkey + "_reserve" || !wallet}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-blue-500/40 text-blue-400 hover:border-blue-400 font-medium transition-colors disabled:opacity-40"
+                >
+                  {acting === pool.pubkey + "_reserve" ? "…" : "Init Reserve Vault"}
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -87,8 +87,9 @@ pub mod myrmex {
         ctx: Context<UpdatePoolConfig>,
         min_premium_bps: u64,
         max_coverage_bps: u64,
+        demo_mode: bool,
     ) -> Result<()> {
-        instructions::update_pool_config::handler(ctx, min_premium_bps, max_coverage_bps)
+        instructions::update_pool_config::handler(ctx, min_premium_bps, max_coverage_bps, demo_mode)
     }
 
     pub fn propose_oracle_authority(
@@ -163,6 +164,15 @@ pub mod myrmex {
     // ── Emergency pool management ─────────────────────────────────────────
     pub fn toggle_pool_active(ctx: Context<TogglePoolActive>, active: bool) -> Result<()> {
         instructions::toggle_pool_active::handler(ctx, active)
+    }
+
+    pub fn set_tranche_split(
+        ctx: Context<SetTrancheSplit>,
+        junior_bps: u64,
+        mezzanine_bps: u64,
+        senior_bps: u64,
+    ) -> Result<()> {
+        instructions::set_tranche_split::handler(ctx, junior_bps, mezzanine_bps, senior_bps)
     }
 
     // ── Feature 3: Reserve fund ───────────────────────────────────────────

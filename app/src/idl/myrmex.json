@@ -2203,6 +2203,44 @@
       ]
     },
     {
+      "name": "set_tranche_split",
+      "discriminator": [
+        112,
+        119,
+        30,
+        51,
+        122,
+        72,
+        190,
+        185
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "junior_bps",
+          "type": "u64"
+        },
+        {
+          "name": "mezzanine_bps",
+          "type": "u64"
+        },
+        {
+          "name": "senior_bps",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "stake_myr",
       "discriminator": [
         45,
@@ -2958,6 +2996,10 @@
         {
           "name": "max_coverage_bps",
           "type": "u64"
+        },
+        {
+          "name": "demo_mode",
+          "type": "bool"
         }
       ]
     },
