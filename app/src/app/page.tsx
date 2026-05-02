@@ -215,7 +215,7 @@ const STEPS = [
   },
   {
     title: "Oracle monitors",
-    desc: "Every 5 minutes, real-world data is fetched, AI-validated by Groq LLaMA, and posted on-chain by a signed oracle keypair.",
+    desc: "Every 5 minutes, real-world data is fetched from 6 live pipelines and posted on-chain by a signed oracle keypair.",
   },
   {
     title: "Auto payout",
@@ -231,8 +231,8 @@ const TECH_PILLARS = [
   },
   {
     icon: "🤖",
-    title: "AI-Validated Oracles",
-    desc: "Groq LLaMA-3.3-70b validates each data reading against dual sources before posting on-chain. 5-minute cron, 6 real data pipelines.",
+    title: "Multi-Source Oracles",
+    desc: "6 real data pipelines (USGS, NHC, NASA, Chainlink). Dual-source cross-validation before posting on-chain. 5-minute cron, signed oracle keypair.",
   },
   {
     icon: "📐",

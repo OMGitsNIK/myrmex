@@ -101,6 +101,23 @@ export default function ClaimPage() {
   }, [policyPubkey]);
 
   const [queuedAt, setQueuedAt] = useState<number | null>(null);
+  const [countdown, setCountdown] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!queuedAt) { setCountdown(null); return; }
+    const finalizeAt = queuedAt + 172800;
+    const tick = () => {
+      const rem = finalizeAt - Math.floor(Date.now() / 1000);
+      if (rem <= 0) { setCountdown("Ready to finalize"); return; }
+      const h = Math.floor(rem / 3600);
+      const m = Math.floor((rem % 3600) / 60);
+      const s = rem % 60;
+      setCountdown(`${h}h ${m.toString().padStart(2,"0")}m ${s.toString().padStart(2,"0")}s`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [queuedAt]);
 
   const handleClaim = async () => {
     if (!program || !wallet || !policyInfo) {
@@ -392,11 +409,21 @@ export default function ClaimPage() {
             . This delay protects against oracle manipulation.
           </p>
           {queuedAt && (
-            <div className="text-xs text-gray-500">
-              Finalization available after:{" "}
-              <span className="text-white">
-                {new Date((queuedAt + 172800) * 1000).toLocaleString()}
-              </span>
+            <div className="space-y-1">
+              <div className="text-xs text-gray-500">
+                Finalization available after:{" "}
+                <span className="text-white">
+                  {new Date((queuedAt + 172800) * 1000).toLocaleString()}
+                </span>
+              </div>
+              {countdown && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-gray-400">Time remaining:</span>
+                  <span className="font-mono text-blue-300 font-semibold">
+                    {countdown}
+                  </span>
+                </div>
+              )}
             </div>
           )}
           <a

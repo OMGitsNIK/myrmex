@@ -11,6 +11,22 @@ Categories:
   hurricane        — sustained wind knots > threshold
   stablecoin_depeg — USDC/USDT price < threshold (bps)
   bridge_hack      — bridge TVL drop > threshold %
+
+Risk table calibration sources:
+  earthquake  — USGS Earthquake Hazards Program (earthquake.usgs.gov),
+                USGS annual M5.0+ global frequency (https://earthquake.usgs.gov/earthquakes/browse/stats.php)
+  flood       — USGS National Water Information System (waterdata.usgs.gov),
+                USACE historical flood frequency data
+  crop        — NOAA Palmer Drought Severity Index (PDSI) historical records,
+                USDA NASS crop loss statistics
+  hurricane   — NOAA Atlantic Basin Hurricane Database (HURDAT2),
+                NHC historical landfall frequency by category
+  depeg       — on-chain Chainlink USDC/USD and USDT/USD price history,
+                academic studies on stablecoin depeg events (Lyons & Viswanath-Natraj 2023)
+  bridge_hack — DeFiLlama bridge TVL historical data,
+                Chainalysis Bridge Hack Reports (2022-2024)
+
+Pricing formula: expected_value × volatility_loading × utilization_loading
 """
 
 from fastapi import FastAPI, HTTPException
