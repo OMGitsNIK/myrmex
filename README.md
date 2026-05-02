@@ -245,7 +245,7 @@ Next.js 14 App Router with TypeScript. Connects to Phantom wallet via `@solana/w
 ```bash
 # From repo root
 anchor build
-anchor test   # spins up local validator automatically — all 8 tests should pass
+anchor test   # spins up local validator automatically — all 11 tests should pass
 ```
 
 ### 2. Start the pricing API
@@ -296,10 +296,13 @@ npx ts-node tests/e2e/full-flow.ts
 | 6 | Expire policy frees collateral | Cron automation path |
 | 7 | LP withdrawal blocked (collateral locked) | Solvency invariant |
 | 8 | LP withdrawal succeeds after expiry | Full LP exit path |
+| 9 | Payout rejected after oracle staleness | 24-hour freshness window enforced |
+| 10 | Payout rejected for expired policy | Expiry timestamp enforced |
+| 11 | Payout rejected for mismatched scope hash | Scope binding prevents cross-pool exploit |
 
 ```bash
 anchor test
-# 8 passing (9s)
+# 11 passing
 ```
 
 ---
@@ -342,17 +345,31 @@ anchor test
 │                                                                  │
 │   initialize_pool  fund_pool  create_policy  trigger_payout      │
 │   expire_policy    withdraw_lp  stake_myr  cast_vote             │
+│   queue_payout  finalize_payout  veto_payout  queue_proposal     │
+│   execute_proposal  fund_tranche  withdraw_tranche  + more       │
 └──────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Protocol Features
+
+Beyond the core insurance primitives, MYRMEX implements five production-grade protocol mechanisms:
+
+| Feature | Description | Instructions |
+|---------|-------------|-------------|
+| **48-hour payout delay** | Claims queue with a 48-hour verification window before USDC moves. Community can veto suspected oracle manipulation. | `queue_payout`, `finalize_payout`, `veto_payout` |
+| **Governance timelock** | Passed proposals must sit in a 48-hour timelock before execution. MYR stakers vote; DAO can queue and execute parameter changes. | `stake_myr`, `cast_vote`, `queue_proposal`, `execute_proposal` |
+| **Tranched liquidity** | LPs can deposit into Junior (20%), Mezzanine (30%), or Senior (50%) tranches. Junior absorbs losses first; Senior earns lowest yield with lowest risk. | `fund_tranche`, `withdraw_tranche` |
+| **Reserve fund** | A protocol-level reserve account absorbs tail losses before any tranche is touched. | `initialize_reserve` |
+| **Oracle multi-sig** | Pool configs can require M-of-N oracle signatures before a report is accepted on-chain. | `initialize_oracle_multisig` |
 
 ---
 
 ## Known Limitations
 
 1. **Oracle authority**: Oracle reports are posted by a permissioned keypair (`oracle_authority` in `pool_config`). Production would integrate Switchboard or Pyth for trustless, manipulation-resistant feeds.
-2. **Pool config is immutable**: No update path for `oracle_authority`, `min_premium_bps`, or `max_coverage_bps` once set. A governance-gated `update_pool_config` instruction is planned for v2.1.
-3. **Governance proposals are off-chain**: MYR staking and `cast_vote` instructions exist on-chain, but proposal creation and indexing are not yet fully on-chain.
-4. **No mainnet**: Devnet only. Do not deploy with real funds without a professional security audit.
+2. **No mainnet**: Devnet only. Do not deploy with real funds without a professional security audit.
 
 ---
 
@@ -366,5 +383,5 @@ anchor test
 | Wallet | @solana/wallet-adapter (Phantom, Solflare, Coinbase, Torus) |
 | REST API | Node.js, Express, TypeScript, SQLite |
 | Pricing engine | Python 3.11, FastAPI, Pydantic |
-| Testing | Anchor/Mocha (8 integration tests) |
+| Testing | Anchor/Mocha (11 integration tests) |
 | Deployment | Vercel (frontend), Railway (APIs) |
