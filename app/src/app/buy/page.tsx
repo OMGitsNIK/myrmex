@@ -249,7 +249,23 @@ export default function BuyPage() {
       ]);
       toast.success("Policy created!");
     } catch (e: unknown) {
-      toast.error("Transaction failed", { description: (e as Error).message });
+      const msg = (e as Error).message ?? "";
+      if (msg.includes("AccountNotInitialized"))
+        toast.error("Pool not ready", { description: "A required on-chain account is missing. Contact the team." });
+      else if (msg.includes("InsufficientLiquidity"))
+        toast.error("Insufficient pool liquidity", { description: "The pool doesn't have enough USDC to back this payout amount. Try a smaller payout." });
+      else if (msg.includes("InsufficientPremium"))
+        toast.error("Premium too low", { description: "The premium doesn't meet the pool's minimum floor. Increase payout amount or reduce duration." });
+      else if (msg.includes("CoverageCapExceeded"))
+        toast.error("Coverage cap reached", { description: "This pool is at maximum utilization. Try a smaller payout amount." });
+      else if (msg.includes("WrongOracle"))
+        toast.error("Oracle mismatch", { description: "The oracle authority doesn't match this pool's configuration." });
+      else if (msg.includes("User rejected") || msg.includes("user rejected"))
+        toast.error("Transaction cancelled");
+      else if (msg.includes("0x1") || msg.includes("insufficient funds"))
+        toast.error("Insufficient USDC", { description: "You need devnet USDC to buy coverage. Get some at spl-token-faucet.vercel.app" });
+      else
+        toast.error("Transaction failed", { description: msg.slice(0, 200) });
     } finally {
       setIsSubmitting(false);
     }

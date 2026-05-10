@@ -175,7 +175,17 @@ function SimulateInner() {
       setTotalMs(Date.now() - start);
       toast.success(`Payout executed in ${Date.now() - start}ms!`);
     } catch (e: unknown) {
-      toast.error("Simulation failed", { description: (e as Error).message });
+      const msg = (e as Error).message ?? "";
+      let description = msg.slice(0, 200);
+      if (msg.includes("PolicyAlreadyClaimed") || msg.includes("already in use"))
+        description = "This policy has already been claimed.";
+      else if (msg.includes("TriggerNotMet"))
+        description = "Oracle value doesn't meet this policy's trigger condition.";
+      else if (msg.includes("OracleReportStale"))
+        description = "No fresh oracle report found. The oracle posts every 5 minutes — try again shortly.";
+      else if (msg.includes("Policy not found") || msg.includes("not found"))
+        description = "Policy not found. Double-check the pubkey.";
+      toast.error("Simulation failed", { description });
       setSteps((prev) =>
         prev.map((s) =>
           s.status === "running" || s.status === "idle"
