@@ -185,6 +185,7 @@ async function postReport(
       pool: poolPk,
       poolConfig: poolConfigPda,
       oracleReport: oracleReportPda,
+      oracleMultisigConfig: null,
       systemProgram: anchor.web3.SystemProgram.programId,
     })
     .rpc();

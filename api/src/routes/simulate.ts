@@ -178,6 +178,7 @@ router.post("/", async (req, res) => {
         pool: poolPk,
         poolConfig: poolConfigPda,
         oracleReport: oracleReportPda,
+        oracleMultisigConfig: null,
         systemProgram: anchor.web3.SystemProgram.programId,
       })
       .rpc();
