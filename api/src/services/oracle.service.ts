@@ -54,9 +54,7 @@ const SCOPE_SEEDS = {
 // ── Keypair / Program ─────────────────────────────────────────────────────
 
 // When true: refuse to post if cross-source values disagree beyond tolerance.
-const ORACLE_MULTISIG_MODE =
-  process.env.ORACLE_MULTISIG_MODE === "true" ||
-  process.env.NODE_ENV === "production";
+const ORACLE_MULTISIG_MODE = process.env.ORACLE_MULTISIG_MODE === "true";
 
 function loadOracleKeypair(): Keypair {
   if (process.env.ORACLE_KEYPAIR_JSON) {
