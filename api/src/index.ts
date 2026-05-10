@@ -14,6 +14,7 @@ import { statsRouter } from "./routes/stats";
 import { oracleRouter } from "./routes/oracle";
 import { proposalsRouter } from "./routes/proposals";
 import { pendingPayoutsRouter } from "./routes/pending-payouts";
+import { faucetRouter } from "./routes/faucet";
 import { startIndexer } from "./services/indexer.service";
 import { startCron } from "./services/cron.service";
 import { startOracleCron } from "./services/oracle.service";
@@ -81,6 +82,7 @@ app.use("/api/stats", statsRouter);
 app.use("/api/oracle-report", oracleRouter);
 app.use("/api/proposals", proposalsRouter);
 app.use("/api/pending-payouts", pendingPayoutsRouter);
+app.use("/api/faucet", faucetRouter);
 
 app.get("/health", (_, res) =>
   res.json({ status: "ok", service: "myrmex-api", version: "2.0-oracle" })

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useAnchorProgram } from "@/hooks/useAnchorProgram";
 import { usePremiumQuote } from "@/hooks/usePremiumQuote";
 import {
@@ -263,7 +263,7 @@ export default function BuyPage() {
       else if (msg.includes("User rejected") || msg.includes("user rejected"))
         toast.error("Transaction cancelled");
       else if (msg.includes("0x1") || msg.includes("insufficient funds"))
-        toast.error("Insufficient USDC", { description: "You need devnet USDC to buy coverage. Get some at spl-token-faucet.vercel.app" });
+        toast.error("Insufficient USDC", { description: "Click 'Get 100 Test USDC' below to fund your wallet." });
       else
         toast.error("Transaction failed", { description: msg.slice(0, 200) });
     } finally {
@@ -273,16 +273,49 @@ export default function BuyPage() {
 
   const presets = THRESHOLD_PRESETS[selectedType.key] ?? [];
 
+  const [faucetLoading, setFaucetLoading] = useState(false);
+  const handleFaucet = useCallback(async () => {
+    if (!wallet) { toast.error("Connect your wallet first"); return; }
+    setFaucetLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/faucet`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wallet: wallet.publicKey.toBase58() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast.success("100 test USDC sent to your wallet!", {
+        description: "Refresh your wallet balance. You can now buy coverage.",
+      });
+    } catch (e: unknown) {
+      toast.error("Faucet failed", { description: (e as Error).message });
+    } finally {
+      setFaucetLoading(false);
+    }
+  }, [wallet]);
+
   return (
     <div className="max-w-2xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-white tracking-tight">
-          Buy Coverage
-        </h1>
-        <p className="text-gray-400 mt-2">
-          Parametric insurance — no adjusters, no claims. USDC sent
-          automatically when the oracle confirms your trigger.
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-bold text-white tracking-tight">
+            Buy Coverage
+          </h1>
+          <p className="text-gray-400 mt-2">
+            Parametric insurance — no adjusters, no claims. USDC sent
+            automatically when the oracle confirms your trigger.
+          </p>
+        </div>
+        {wallet && (
+          <button
+            onClick={handleFaucet}
+            disabled={faucetLoading}
+            className="shrink-0 border border-[var(--accent)]/40 text-[var(--accent)] text-xs font-semibold px-3 py-2 rounded-lg hover:border-[var(--accent)] hover:bg-[var(--accent)]/5 disabled:opacity-40 transition-all"
+          >
+            {faucetLoading ? "Sending..." : "Get 100 Test USDC"}
+          </button>
+        )}
       </div>
 
       {/* Active policy cards */}

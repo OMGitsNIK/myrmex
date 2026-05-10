@@ -18,6 +18,7 @@ const stats_1 = require("./routes/stats");
 const oracle_1 = require("./routes/oracle");
 const proposals_1 = require("./routes/proposals");
 const pending_payouts_1 = require("./routes/pending-payouts");
+const faucet_1 = require("./routes/faucet");
 const indexer_service_1 = require("./services/indexer.service");
 const cron_service_1 = require("./services/cron.service");
 const oracle_service_1 = require("./services/oracle.service");
@@ -75,6 +76,7 @@ app.use("/api/stats", stats_1.statsRouter);
 app.use("/api/oracle-report", oracle_1.oracleRouter);
 app.use("/api/proposals", proposals_1.proposalsRouter);
 app.use("/api/pending-payouts", pending_payouts_1.pendingPayoutsRouter);
+app.use("/api/faucet", faucet_1.faucetRouter);
 app.get("/health", (_, res) => res.json({ status: "ok", service: "myrmex-api", version: "2.0-oracle" }));
 // 404 for unmatched routes
 app.use((_req, res) => {
