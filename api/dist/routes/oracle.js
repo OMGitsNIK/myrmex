@@ -57,6 +57,20 @@ async function fetchReport(poolPk, scopeHash) {
     const report = await program.account.oracleReport.fetch(oracleReportPda);
     return { report, pda: oracleReportPda };
 }
+// POST /api/oracle-report/refresh — force-run all oracle jobs immediately.
+// Gated by ALLOW_SIMULATE so it only works in demo/dev environments.
+router.post("/refresh", async (_req, res) => {
+    if (process.env.ALLOW_SIMULATE !== "true") {
+        return res.status(403).json({ error: "Not enabled in this environment" });
+    }
+    try {
+        res.json({ status: "started", message: "Oracle refresh running in background" });
+        (0, oracle_service_1.runAllJobs)().catch((e) => console.error("[oracle:refresh] error:", e.message));
+    }
+    catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 // GET /api/oracle-report/:pool
 router.get("/:pool", async (req, res) => {
     try {
@@ -131,19 +145,5 @@ router.get("/:pool/audit", async (req, res) => {
         else {
             res.status(500).json({ error: e.message });
         }
-    }
-});
-// POST /api/oracle-report/refresh — force-run all oracle jobs immediately.
-// Gated by ALLOW_SIMULATE so it only works in demo/dev environments.
-router.post("/refresh", async (_req, res) => {
-    if (process.env.ALLOW_SIMULATE !== "true") {
-        return res.status(403).json({ error: "Not enabled in this environment" });
-    }
-    try {
-        res.json({ status: "started", message: "Oracle refresh running in background" });
-        (0, oracle_service_1.runAllJobs)().catch((e) => console.error("[oracle:refresh] error:", e.message));
-    }
-    catch (e) {
-        res.status(500).json({ error: e.message });
     }
 });
