@@ -166,7 +166,7 @@ const COVERAGE_CARDS = [
     icon: "🌾",
     title: "Crop Multi-Factor",
     description:
-      "Composite AI score tracks rainfall, heat stress, and dry days. 500M smallholder farmers have zero safety net.",
+      "Composite score tracks rainfall deficit, heat stress, and dry days via Open-Meteo dual-source. 500M smallholder farmers have zero safety net.",
     trigger: "score < threshold",
     gap: "$100B+",
     oracle: "Open-Meteo dual-source",
