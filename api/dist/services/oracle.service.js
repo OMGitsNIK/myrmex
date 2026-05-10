@@ -36,6 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.runAllJobs = runAllJobs;
 exports.startOracleCron = startOracleCron;
 /**
  * Oracle service — 5-minute cron inside the API process.

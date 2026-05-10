@@ -5,6 +5,7 @@ const express_1 = require("express");
 const web3_js_1 = require("@solana/web3.js");
 const crypto_1 = require("crypto");
 const anchor_service_1 = require("../services/anchor.service");
+const oracle_service_1 = require("../services/oracle.service");
 const router = (0, express_1.Router)();
 exports.oracleRouter = router;
 const PROGRAM_ID = new web3_js_1.PublicKey(process.env.PROGRAM_ID || "9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan");
@@ -130,5 +131,19 @@ router.get("/:pool/audit", async (req, res) => {
         else {
             res.status(500).json({ error: e.message });
         }
+    }
+});
+// POST /api/oracle-report/refresh — force-run all oracle jobs immediately.
+// Gated by ALLOW_SIMULATE so it only works in demo/dev environments.
+router.post("/refresh", async (_req, res) => {
+    if (process.env.ALLOW_SIMULATE !== "true") {
+        return res.status(403).json({ error: "Not enabled in this environment" });
+    }
+    try {
+        res.json({ status: "started", message: "Oracle refresh running in background" });
+        (0, oracle_service_1.runAllJobs)().catch((e) => console.error("[oracle:refresh] error:", e.message));
+    }
+    catch (e) {
+        res.status(500).json({ error: e.message });
     }
 });

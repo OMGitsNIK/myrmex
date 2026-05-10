@@ -715,6 +715,8 @@ async function runAllJobs() {
   ]);
 }
 
+export { runAllJobs };
+
 export function startOracleCron() {
   cron.schedule("*/5 * * * *", runAllJobs);
   console.log(
