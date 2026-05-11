@@ -287,11 +287,37 @@ export default function PoolPage() {
       toast.success(`Deposited ${amount} USDC into ${poolName} pool`);
       refreshLpBalance(poolPubkey, lpMintKey);
     } catch (e: unknown) {
-      toast.error("Deposit failed", { description: (e as Error).message });
+      const msg = (e as Error).message ?? "";
+      if (msg.includes("0x1") || msg.includes("insufficient funds"))
+        toast.error("Insufficient USDC", { description: "Click 'Get 100 Test USDC' to fund your wallet first." });
+      else
+        toast.error("Deposit failed", { description: msg.slice(0, 200) });
     } finally {
       setSubmitting(null);
     }
   };
+
+  const [faucetLoading, setFaucetLoading] = useState(false);
+  const handleFaucet = useCallback(async () => {
+    if (!wallet) { toast.error("Connect your wallet first"); return; }
+    setFaucetLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/faucet`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wallet: wallet.publicKey.toBase58() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast.success("100 test USDC sent to your wallet!", {
+        description: "Refresh your wallet balance, then deposit.",
+      });
+    } catch (e: unknown) {
+      toast.error("Faucet failed", { description: (e as Error).message });
+    } finally {
+      setFaucetLoading(false);
+    }
+  }, [wallet]);
 
   const handleWithdraw = async (poolPubkey: string) => {
     if (!program || !wallet) return;
@@ -376,15 +402,26 @@ export default function PoolPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-white tracking-tight">
-          Liquidity Pools
-        </h1>
-        <p className="text-gray-400 mt-2">
-          Deposit USDC to earn premiums from policy buyers. Receive LP tokens
-          representing your share. Oracle reports update every 5 minutes from
-          live data sources.
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-bold text-white tracking-tight">
+            Liquidity Pools
+          </h1>
+          <p className="text-gray-400 mt-2">
+            Deposit USDC to earn premiums from policy buyers. Receive LP tokens
+            representing your share. Oracle reports update every 5 minutes from
+            live data sources.
+          </p>
+        </div>
+        {wallet && (
+          <button
+            onClick={handleFaucet}
+            disabled={faucetLoading}
+            className="shrink-0 border border-[var(--accent)]/40 text-[var(--accent)] text-xs font-semibold px-3 py-2 rounded-lg hover:border-[var(--accent)] hover:bg-[var(--accent)]/5 disabled:opacity-40 transition-all"
+          >
+            {faucetLoading ? "Sending..." : "Get 100 Test USDC"}
+          </button>
+        )}
       </div>
 
       {/* Persistent success cards */}
