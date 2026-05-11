@@ -1,9 +1,8 @@
 import { Router } from "express";
-import * as anchor from "@coral-xyz/anchor";
 import {
   createAssociatedTokenAccountIdempotent,
-  mintTo,
-  TOKEN_PROGRAM_ID,
+  transfer,
+  getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import * as fs from "fs";
@@ -13,27 +12,32 @@ const router = Router();
 
 const RPC_URL = process.env.RPC_URL || "https://api.devnet.solana.com";
 const USDC_MINT = new PublicKey("HM4vdUJGhAbD44G1CDQ7gx6HFUTvaoCgxtkNPXNfP9jo");
-const FAUCET_AMOUNT = 100_000_000; // 100 USDC (6 decimals)
+// Pre-funded ATA owned by oracle keypair — holds 50,000 USDC for demo faucet
+const FAUCET_SOURCE_ATA = new PublicKey("APUcuAeoBZc4ozW2fDCVz9QvWMMUFFzJU46k671Cvakx");
+const FAUCET_AMOUNT = 100_000_000; // 100 USDC
 
-function loadAdminKeypair(): Keypair {
+function loadOracleKeypair(): Keypair {
   if (process.env.ORACLE_KEYPAIR_JSON) {
     return Keypair.fromSecretKey(
       Buffer.from(JSON.parse(process.env.ORACLE_KEYPAIR_JSON))
     );
   }
-  if (process.env.SERVER_KEYPAIR) {
+  const keyPath = path.join(process.env.HOME || "~", ".config/solana/oracle.json");
+  if (fs.existsSync(keyPath)) {
     return Keypair.fromSecretKey(
-      Buffer.from(JSON.parse(process.env.SERVER_KEYPAIR))
+      Buffer.from(JSON.parse(fs.readFileSync(keyPath, "utf-8")))
     );
   }
-  const fallback = path.join(process.env.HOME || "~", ".config/solana/id.json");
   return Keypair.fromSecretKey(
-    Buffer.from(JSON.parse(fs.readFileSync(fallback, "utf-8")))
+    Buffer.from(JSON.parse(fs.readFileSync(
+      path.join(process.env.HOME || "~", ".config/solana/id.json"), "utf-8"
+    )))
   );
 }
 
 // POST /api/faucet  { wallet: "<pubkey>" }
-// Mints 100 devnet USDC to the given wallet. Only works when ALLOW_SIMULATE=true.
+// Transfers 100 devnet USDC from the pre-funded oracle ATA to the given wallet.
+// Only works when ALLOW_SIMULATE=true.
 router.post("/", async (req, res) => {
   if (process.env.ALLOW_SIMULATE !== "true") {
     return res.status(403).json({ error: "Faucet disabled in this environment" });
@@ -51,30 +55,25 @@ router.post("/", async (req, res) => {
 
   try {
     const connection = new Connection(RPC_URL, "confirmed");
-    const admin = loadAdminKeypair();
+    const oracle = loadOracleKeypair();
 
-    const ata = await createAssociatedTokenAccountIdempotent(
+    const destAta = await createAssociatedTokenAccountIdempotent(
       connection,
-      admin,
+      oracle,
       USDC_MINT,
       walletPk
     );
 
-    const sig = await mintTo(
+    const sig = await transfer(
       connection,
-      admin,
-      USDC_MINT,
-      ata,
-      admin,
+      oracle,
+      FAUCET_SOURCE_ATA,
+      destAta,
+      oracle,
       FAUCET_AMOUNT
     );
 
-    res.json({
-      success: true,
-      amount_usdc: 100,
-      ata: ata.toBase58(),
-      tx: sig,
-    });
+    res.json({ success: true, amount_usdc: 100, ata: destAta.toBase58(), tx: sig });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }

@@ -43,19 +43,22 @@ const router = (0, express_1.Router)();
 exports.faucetRouter = router;
 const RPC_URL = process.env.RPC_URL || "https://api.devnet.solana.com";
 const USDC_MINT = new web3_js_1.PublicKey("HM4vdUJGhAbD44G1CDQ7gx6HFUTvaoCgxtkNPXNfP9jo");
-const FAUCET_AMOUNT = 100000000; // 100 USDC (6 decimals)
-function loadAdminKeypair() {
+// Pre-funded ATA owned by oracle keypair — holds 50,000 USDC for demo faucet
+const FAUCET_SOURCE_ATA = new web3_js_1.PublicKey("APUcuAeoBZc4ozW2fDCVz9QvWMMUFFzJU46k671Cvakx");
+const FAUCET_AMOUNT = 100000000; // 100 USDC
+function loadOracleKeypair() {
     if (process.env.ORACLE_KEYPAIR_JSON) {
         return web3_js_1.Keypair.fromSecretKey(Buffer.from(JSON.parse(process.env.ORACLE_KEYPAIR_JSON)));
     }
-    if (process.env.SERVER_KEYPAIR) {
-        return web3_js_1.Keypair.fromSecretKey(Buffer.from(JSON.parse(process.env.SERVER_KEYPAIR)));
+    const keyPath = path.join(process.env.HOME || "~", ".config/solana/oracle.json");
+    if (fs.existsSync(keyPath)) {
+        return web3_js_1.Keypair.fromSecretKey(Buffer.from(JSON.parse(fs.readFileSync(keyPath, "utf-8"))));
     }
-    const fallback = path.join(process.env.HOME || "~", ".config/solana/id.json");
-    return web3_js_1.Keypair.fromSecretKey(Buffer.from(JSON.parse(fs.readFileSync(fallback, "utf-8"))));
+    return web3_js_1.Keypair.fromSecretKey(Buffer.from(JSON.parse(fs.readFileSync(path.join(process.env.HOME || "~", ".config/solana/id.json"), "utf-8"))));
 }
 // POST /api/faucet  { wallet: "<pubkey>" }
-// Mints 100 devnet USDC to the given wallet. Only works when ALLOW_SIMULATE=true.
+// Transfers 100 devnet USDC from the pre-funded oracle ATA to the given wallet.
+// Only works when ALLOW_SIMULATE=true.
 router.post("/", async (req, res) => {
     if (process.env.ALLOW_SIMULATE !== "true") {
         return res.status(403).json({ error: "Faucet disabled in this environment" });
@@ -72,15 +75,10 @@ router.post("/", async (req, res) => {
     }
     try {
         const connection = new web3_js_1.Connection(RPC_URL, "confirmed");
-        const admin = loadAdminKeypair();
-        const ata = await (0, spl_token_1.createAssociatedTokenAccountIdempotent)(connection, admin, USDC_MINT, walletPk);
-        const sig = await (0, spl_token_1.mintTo)(connection, admin, USDC_MINT, ata, admin, FAUCET_AMOUNT);
-        res.json({
-            success: true,
-            amount_usdc: 100,
-            ata: ata.toBase58(),
-            tx: sig,
-        });
+        const oracle = loadOracleKeypair();
+        const destAta = await (0, spl_token_1.createAssociatedTokenAccountIdempotent)(connection, oracle, USDC_MINT, walletPk);
+        const sig = await (0, spl_token_1.transfer)(connection, oracle, FAUCET_SOURCE_ATA, destAta, oracle, FAUCET_AMOUNT);
+        res.json({ success: true, amount_usdc: 100, ata: destAta.toBase58(), tx: sig });
     }
     catch (e) {
         res.status(500).json({ error: e.message });
