@@ -263,7 +263,7 @@ export default function BuyPage() {
       else if (msg.includes("User rejected") || msg.includes("user rejected"))
         toast.error("Transaction cancelled");
       else if (msg.includes("0x1") || msg.includes("insufficient funds"))
-        toast.error("Insufficient USDC", { description: "Click 'Get 100 Test USDC' below to fund your wallet." });
+        toast.error("Insufficient USDC", { description: "Click 'Get 1000 Test USDC' below to fund your wallet." });
       else
         toast.error("Transaction failed", { description: msg.slice(0, 200) });
     } finally {
@@ -285,7 +285,7 @@ export default function BuyPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      toast.success("100 test USDC sent to your wallet!", {
+      toast.success("1000 test USDC sent to your wallet!", {
         description: "Refresh your wallet balance. You can now buy coverage.",
       });
     } catch (e: unknown) {
@@ -313,7 +313,7 @@ export default function BuyPage() {
             disabled={faucetLoading}
             className="shrink-0 border border-[var(--accent)]/40 text-[var(--accent)] text-xs font-semibold px-3 py-2 rounded-lg hover:border-[var(--accent)] hover:bg-[var(--accent)]/5 disabled:opacity-40 transition-all"
           >
-            {faucetLoading ? "Sending..." : "Get 100 Test USDC"}
+            {faucetLoading ? "Sending..." : "Get 1000 Test USDC"}
           </button>
         )}
       </div>

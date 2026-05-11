@@ -289,7 +289,7 @@ export default function PoolPage() {
     } catch (e: unknown) {
       const msg = (e as Error).message ?? "";
       if (msg.includes("0x1") || msg.includes("insufficient funds"))
-        toast.error("Insufficient USDC", { description: "Click 'Get 100 Test USDC' to fund your wallet first." });
+        toast.error("Insufficient USDC", { description: "Click 'Get 1000 Test USDC' to fund your wallet first." });
       else
         toast.error("Deposit failed", { description: msg.slice(0, 200) });
     } finally {
@@ -309,7 +309,7 @@ export default function PoolPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      toast.success("100 test USDC sent to your wallet!", {
+      toast.success("1000 test USDC sent to your wallet!", {
         description: "Refresh your wallet balance, then deposit.",
       });
     } catch (e: unknown) {
@@ -419,7 +419,7 @@ export default function PoolPage() {
             disabled={faucetLoading}
             className="shrink-0 border border-[var(--accent)]/40 text-[var(--accent)] text-xs font-semibold px-3 py-2 rounded-lg hover:border-[var(--accent)] hover:bg-[var(--accent)]/5 disabled:opacity-40 transition-all"
           >
-            {faucetLoading ? "Sending..." : "Get 100 Test USDC"}
+            {faucetLoading ? "Sending..." : "Get 1000 Test USDC"}
           </button>
         )}
       </div>

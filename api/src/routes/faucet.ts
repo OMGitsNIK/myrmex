@@ -14,7 +14,7 @@ const RPC_URL = process.env.RPC_URL || "https://api.devnet.solana.com";
 const USDC_MINT = new PublicKey("HM4vdUJGhAbD44G1CDQ7gx6HFUTvaoCgxtkNPXNfP9jo");
 // Pre-funded ATA owned by oracle keypair — holds 50,000 USDC for demo faucet
 const FAUCET_SOURCE_ATA = new PublicKey("APUcuAeoBZc4ozW2fDCVz9QvWMMUFFzJU46k671Cvakx");
-const FAUCET_AMOUNT = 100_000_000; // 100 USDC
+const FAUCET_AMOUNT = 1_000_000_000; // 1000 USDC
 
 function loadOracleKeypair(): Keypair {
   if (process.env.ORACLE_KEYPAIR_JSON) {
@@ -73,7 +73,7 @@ router.post("/", async (req, res) => {
       FAUCET_AMOUNT
     );
 
-    res.json({ success: true, amount_usdc: 100, ata: destAta.toBase58(), tx: sig });
+    res.json({ success: true, amount_usdc: 1000, ata: destAta.toBase58(), tx: sig });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
