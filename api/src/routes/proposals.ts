@@ -60,7 +60,11 @@ router.get("/", async (_req, res) => {
     }
 
     proposals.sort((a, b) => b.id - a.id);
-    res.json(proposals);
+    // Filter out zero-vote rejected proposals (stale pre-migration accounts)
+    const filtered = proposals.filter(
+      (p) => p.status !== "rejected" || p.votes_for > 0 || p.votes_against > 0
+    );
+    res.json(filtered);
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }

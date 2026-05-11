@@ -32,8 +32,8 @@ export default function ClientProviders({
     { href: "/portfolio", label: "Portfolio" },
     { href: "/claim", label: "Claim" },
     { href: "/governance", label: "Governance" },
+    { href: "/admin", label: "Payout Queue" },
     { href: "/simulate", label: "Demo [TESTNET]" },
-    { href: "/admin", label: "Governance" },
   ];
 
   const isActive = (href: string) => pathname === href;
