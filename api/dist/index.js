@@ -22,6 +22,7 @@ const faucet_1 = require("./routes/faucet");
 const indexer_service_1 = require("./services/indexer.service");
 const cron_service_1 = require("./services/cron.service");
 const oracle_service_1 = require("./services/oracle.service");
+const keepalive_service_1 = require("./services/keepalive.service");
 const ALLOWED_ORIGINS = [
     "https://myrmex-iota.vercel.app",
     "http://localhost:3000",
@@ -93,6 +94,7 @@ app.listen(PORT, () => {
     console.log(`MYRMEX API running on port ${PORT}`);
     (0, indexer_service_1.startIndexer)();
     (0, cron_service_1.startCron)();
+    (0, keepalive_service_1.startKeepAlive)();
     if (process.env.ENABLE_ORACLE_CRON === "true") {
         (0, oracle_service_1.startOracleCron)();
     }

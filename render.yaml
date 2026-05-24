@@ -1,0 +1,72 @@
+# Render Blueprint — deploys MYRMEX api + pricing on Render's free Web Service tier.
+# How to use:
+#   1. Sign up at https://render.com (no credit card required for free tier).
+#   2. New → Blueprint → connect GitHub repo OMGitsNIK/myrmex.
+#   3. Render reads this file and proposes both services.
+#   4. Set the three secret env vars in the dashboard (sync: false below):
+#        - SERVER_KEYPAIR
+#        - ORACLE_KEYPAIR_JSON
+#        - PRICING_API_URL  (set to https://myrmex-pricing.onrender.com after first deploy)
+#   5. Click Apply. Both services build & deploy.
+#
+# Free tier note: services spin down after 15 min of no inbound traffic.
+# The api includes a self-ping cron (api/src/index.ts) that hits its own
+# /health and the pricing /docs every 13 minutes to keep both warm.
+
+services:
+  - type: web
+    name: myrmex-api
+    runtime: node
+    rootDir: api
+    plan: free
+    region: oregon
+    buildCommand: yarn install --frozen-lockfile && yarn build
+    startCommand: yarn start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ALLOW_SIMULATE
+        value: "true"
+      - key: ENABLE_ORACLE_CRON
+        value: "true"
+      - key: RPC_URL
+        value: https://api.devnet.solana.com
+      - key: PROGRAM_ID
+        value: 9naJhrt9FdAHLwdLnQfgx6citNgEWmW8aLovCS9kYpan
+      - key: USDC_MINT
+        value: HM4vdUJGhAbD44G1CDQ7gx6HFUTvaoCgxtkNPXNfP9jo
+      - key: POOL_TYPE_0
+        value: EHxPZAMvRhumjFeChfeD9bn2Ju1RWf7RM45pY5vzEhNH
+      - key: POOL_TYPE_1
+        value: HfyGsQVVsxt6BNM7UzTepBo91DKYdqLy7RKuLrwnM1YY
+      - key: POOL_TYPE_2
+        value: HuPG3dmBftRCAwg71tro7pmp2hjoCT8KWaNtytwUqUo2
+      - key: POOL_TYPE_3
+        value: ZZWgmeRUSdQyuarSb2zPFron2x88UgexhTQn8hJr9uD
+      - key: POOL_TYPE_4
+        value: CcGbU74HpT8sjDU5NDDWFzBPYEARBEfAac4ovDWwgxWU
+      - key: POOL_TYPE_5
+        value: AqKUYemw3A6GbYFnCFwE9S1f1QCfhH4EAjFQCDxyfUtQ
+      # Secrets — set these in the Render dashboard after first deploy.
+      - key: SERVER_KEYPAIR
+        sync: false
+      - key: ORACLE_KEYPAIR_JSON
+        sync: false
+      - key: PRICING_API_URL
+        sync: false
+
+  - type: web
+    name: myrmex-pricing
+    runtime: python
+    rootDir: pricing
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /docs
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
