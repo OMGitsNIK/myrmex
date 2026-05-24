@@ -232,7 +232,7 @@ const TECH_PILLARS = [
   {
     icon: "🤖",
     title: "Multi-Source Oracles",
-    desc: "6 real data pipelines (USGS, NHC, NASA, Chainlink). Dual-source cross-validation before posting on-chain. 5-minute cron, signed oracle keypair.",
+    desc: "6 real data pipelines (USGS, NOAA, Open-Meteo, CoinGecko, DeFiLlama). Dual-source cross-validation before posting on-chain. 5-minute cron, signed oracle keypair.",
   },
   {
     icon: "📐",

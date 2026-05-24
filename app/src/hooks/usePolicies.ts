@@ -1,7 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useAnchorWallet } from "@solana/wallet-adapter-react";
+import {
+  useAnchorWallet,
+  useConnection,
+} from "@solana/wallet-adapter-react";
 import { API_URL } from "@/lib/constants";
+import { fetchPoliciesOnChain, fetchWithTimeout } from "@/lib/onchain";
 
 export interface PolicyData {
   pubkey: string;
@@ -25,32 +29,63 @@ export interface PolicyData {
   };
 }
 
+export type PolicySource = "api" | "onchain";
+
 export function usePolicies() {
   const wallet = useAnchorWallet();
+  const { connection } = useConnection();
   const [policies, setPolicies] = useState<PolicyData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [source, setSource] = useState<PolicySource | null>(null);
 
   useEffect(() => {
     if (!wallet) {
       setPolicies([]);
+      setSource(null);
       return;
     }
+    let cancelled = false;
     setLoading(true);
-    fetch(`${API_URL}/api/policies/${wallet.publicKey.toBase58()}`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`API error ${r.status}`);
-        return r.json();
-      })
-      .then((data: unknown) => {
+    setError(null);
+
+    const run = async () => {
+      const walletStr = wallet.publicKey.toBase58();
+      try {
+        const res = await fetchWithTimeout(
+          `${API_URL}/api/policies/${walletStr}`,
+          4000
+        );
+        if (!res.ok) throw new Error(`API error ${res.status}`);
+        const data = await res.json();
         if (!Array.isArray(data))
           throw new Error("Unexpected API response shape");
+        if (cancelled) return;
         setPolicies(data as PolicyData[]);
-        setError(null);
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [wallet?.publicKey.toString()]);
+        setSource("api");
+      } catch {
+        try {
+          const onchain = await fetchPoliciesOnChain(
+            connection,
+            wallet.publicKey
+          );
+          if (cancelled) return;
+          setPolicies(onchain as unknown as PolicyData[]);
+          setSource("onchain");
+        } catch (chainErr) {
+          if (cancelled) return;
+          setError((chainErr as Error).message);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
 
-  return { policies, loading, error };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [wallet?.publicKey.toString(), connection]);
+
+  return { policies, loading, error, source };
 }
